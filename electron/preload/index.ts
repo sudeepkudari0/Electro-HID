@@ -21,7 +21,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     // Whisper API
     whisper: {
-        loadModel: async (modelName: string = 'tiny.en') => {
+        loadModel: async (modelName: string = 'base.en') => {
             console.log('[Preload] loadModel called with:', modelName);
             return await ipcRenderer.invoke(IPC_CHANNELS.WHISPER_LOAD_MODEL, modelName);
         },

@@ -33,7 +33,7 @@ export function useWhisper(): UseWhisperReturn {
                 throw new Error('Electron API not available. Preload script may not have loaded correctly.');
             }
 
-            const result = await window.electronAPI.whisper.loadModel('tiny.en');
+            const result = await window.electronAPI.whisper.loadModel('base.en');
 
             if (result.success) {
                 setIsModelLoaded(true);

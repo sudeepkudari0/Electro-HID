@@ -1,0 +1,9 @@
+# Whisper binaries (download separately, don't commit)
+*.exe
+*.dll
+
+# Model files are large, download separately
+*.bin
+
+# Keep directory structure
+!.gitkeep

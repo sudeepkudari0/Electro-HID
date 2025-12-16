@@ -1,22 +1,30 @@
 import path from 'path';
 import { app } from 'electron';
-
-// In CommonJS, require is available natively
-const whisperPkg = require('@lumen-labs-dev/whisper-node');
-const whisper = whisperPkg.whisper || whisperPkg.default;
+import { spawn } from 'child_process';
+import { promises as fs } from 'fs';
 
 export class WhisperTranscriber {
     private modelPath: string | null = null;
+    private whisperExe: string | null = null;
     private isInitialized = false;
-    private modelName: string = 'tiny.en';
+    private modelName: string = 'base.en';
 
     constructor() {
-        // Models will be stored in userData directory
-        const modelsDir = path.join(app.getPath('userData'), 'models');
-        console.log('Models directory:', modelsDir);
+        // Initialize paths
+        this.initializePaths();
     }
 
-    async initialize(modelName: string = 'tiny.en'): Promise<void> {
+    private initializePaths() {
+        // Get the resources path - different for dev vs packaged
+        const resources = app.isPackaged
+            ? process.resourcesPath
+            : path.join(process.cwd(), 'native');
+
+        this.whisperExe = path.join(resources, 'whisper', 'whisper.exe');
+        console.log('Whisper executable path:', this.whisperExe);
+    }
+
+    async initialize(modelName: string = 'base.en'): Promise<void> {
         if (this.isInitialized) {
             console.log('Whisper already initialized');
             return;
@@ -25,10 +33,29 @@ export class WhisperTranscriber {
         try {
             console.log(`Initializing Whisper with model: ${modelName}`);
 
-            // Store model name for later use
             this.modelName = modelName;
             const modelPath = await this.ensureModel(modelName);
             this.modelPath = modelPath;
+
+            // Verify whisper.exe exists
+            if (!this.whisperExe) {
+                throw new Error('Whisper executable path not initialized');
+            }
+
+            try {
+                await fs.access(this.whisperExe);
+                console.log('✓ Whisper executable found');
+            } catch {
+                throw new Error(`Whisper executable not found at: ${this.whisperExe}\n\nPlease build/download whisper.cpp and place whisper.exe in native/whisper/`);
+            }
+
+            // Verify model exists
+            try {
+                await fs.access(modelPath);
+                console.log('✓ Model file found');
+            } catch {
+                console.warn(`Model file not found at: ${modelPath}\nWill need to download model`);
+            }
 
             this.isInitialized = true;
             console.log('Whisper initialized successfully');
@@ -39,15 +66,18 @@ export class WhisperTranscriber {
     }
 
     private async ensureModel(modelName: string): Promise<string> {
-        const modelsDir = path.join(app.getPath('userData'), 'models');
+        const resources = app.isPackaged
+            ? process.resourcesPath
+            : path.join(process.cwd(), 'native');
+
+        const modelsDir = path.join(resources, 'whisper', 'models');
         const modelPath = path.join(modelsDir, `ggml-${modelName}.bin`);
 
-        // whisper-node will automatically download the model if it doesn't exist
         return modelPath;
     }
 
     async transcribe(audioData: Float32Array): Promise<string> {
-        if (!this.isInitialized) {
+        if (!this.isInitialized || !this.whisperExe || !this.modelPath) {
             throw new Error('Whisper not initialized. Call initialize() first.');
         }
 
@@ -57,38 +87,89 @@ export class WhisperTranscriber {
 
             // Save temporarily
             const tempPath = path.join(app.getPath('temp'), `whisper-${Date.now()}.wav`);
-            const fs = await import('fs/promises');
             await fs.writeFile(tempPath, wavBuffer);
 
-            // Transcribe using @lumen-labs-dev/whisper-node
-            const result = await whisper(tempPath, {
-                modelName: this.modelName,
-            });
+            console.log('=== Whisper GPU Configuration ===');
+            console.log('Whisper.exe:', this.whisperExe);
+            console.log('Model:', this.modelPath);
+            console.log('Audio file:', tempPath);
 
-            console.log('Whisper raw result:', result);
-            console.log('Result type:', typeof result);
-            console.log('Result is array:', Array.isArray(result));
-            console.log('Result length:', result?.length);
-            console.log('Result JSON:', JSON.stringify(result, null, 2));
+            // Transcribe using native whisper.cpp binary
+            const result = await this.runWhisperProcess(tempPath);
 
             // Clean up temp file
             await fs.unlink(tempPath).catch(() => { });
 
-            // The result is an array of segments with 'text' property
-            if (result && Array.isArray(result) && result.length > 0) {
-                console.log('Processing array result...');
-                // Concatenate all segment texts - whisper-node uses 'speech' property
-                const text = result.map((segment: any) => segment.speech || '').join(' ');
-                console.log('Extracted text:', text);
-                return text;
-            }
-
-            console.log('Result was empty or not an array, returning empty string');
-            return '';
+            return result;
         } catch (error) {
             console.error('Transcription error:', error);
             throw error;
         }
+    }
+
+    private runWhisperProcess(audioPath: string): Promise<string> {
+        return new Promise((resolve, reject) => {
+            if (!this.whisperExe || !this.modelPath) {
+                reject(new Error('Whisper not properly initialized'));
+                return;
+            }
+
+            const args = [
+                '-m', this.modelPath,
+                '-f', audioPath,
+                // '-ng' disables GPU
+                '-nt',              // No timestamps in output
+                '-l', 'en',         // Language: English
+            ];
+
+            // Args: model, audio file, no timestamps, language
+
+            const proc = spawn(this.whisperExe, args, {
+                windowsHide: true,
+            });
+
+            let stdout = '';
+            let stderr = '';
+            let gpuDetected = false;
+
+            proc.stdout.on('data', (data) => {
+                stdout += data.toString();
+            });
+
+            proc.stderr.on('data', (data) => {
+                const text = data.toString();
+                stderr += text;
+                // Detect GPU usage
+                if (text.includes('CUDA') || text.includes('GPU') || text.includes('cuda')) {
+                    gpuDetected = true;
+                }
+            });
+
+            proc.on('close', (code) => {
+                if (code !== 0) {
+                    console.error(`❌ Whisper failed (exit code ${code})`);
+                    reject(new Error(`Whisper exited with code ${code}\n${stderr}`));
+                } else {
+                    // Log GPU status
+                    console.log(gpuDetected ? '🎮 GPU: ENABLED' : '⚠️ GPU: NOT DETECTED (CPU mode)');
+
+                    // Extract transcription
+                    const lines = stdout.split('\n');
+                    const transcriptionLines = lines.filter(line =>
+                        !line.includes('[') &&
+                        line.trim().length > 0
+                    );
+                    const transcription = transcriptionLines.join(' ').trim();
+
+                    console.log('✓ Transcribed:', transcription.substring(0, 80) + '...');
+                    resolve(transcription);
+                }
+            });
+
+            proc.on('error', (error) => {
+                reject(new Error(`Failed to start whisper process: ${error.message}`));
+            });
+        });
     }
 
     private float32ToWav(samples: Float32Array, sampleRate: number): Buffer {
@@ -123,13 +204,14 @@ export class WhisperTranscriber {
         return {
             isLoaded: this.isInitialized,
             modelPath: this.modelPath,
+            whisperExe: this.whisperExe,
         };
     }
 
     async dispose(): Promise<void> {
         this.isInitialized = false;
         this.modelPath = null;
-        this.modelName = 'tiny.en';
+        this.modelName = 'base.en';
     }
 }
 
