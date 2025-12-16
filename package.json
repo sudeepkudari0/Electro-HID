@@ -1,0 +1,91 @@
+{
+  "name": "electro-hid-overlay",
+  "version": "1.0.0",
+  "description": "Minimal Windows Electron overlay app with React + Vite",
+  "main": "dist-electron/main/index.js",
+  "scripts": {
+    "dev": "concurrently \"vite\" \"bun run build:electron\" \"wait-on http://localhost:5173 && electron .\"",
+    "build": "vite build",
+    "build:electron": "tsc -p tsconfig.electron.json && node build-preload.mjs",
+    "build:all": "bun run build && bun run build:electron",
+    "dist": "bun run build:all && electron-builder",
+    "dist:win": "bun run build:all && electron-builder --win",
+    "start": "electron .",
+    "preview": "vite preview",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:debug": "playwright test --debug",
+    "test:e2e:ui": "playwright test --ui"
+  },
+  "keywords": [
+    "electron",
+    "react",
+    "vite",
+    "overlay"
+  ],
+  "author": "",
+  "license": "ISC",
+  "build": {
+    "appId": "com.electrohid.overlay",
+    "productName": "Electro HID Overlay",
+    "asar": false,
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "buildResources": "build",
+      "output": "release"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.57.0",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.23",
+    "concurrently": "^9.1.0",
+    "electron": "33",
+    "electron-builder": "^26.0.12",
+    "esbuild": "^0.27.1",
+    "playwright": "^1.57.0",
+    "postcss": "^8.5.6",
+    "tailwindcss": "3",
+    "tsx": "^4.21.0",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.3",
+    "wait-on": "^8.0.1"
+  },
+  "dependencies": {
+    "@lumen-labs-dev/whisper-node": "^0.4.1",
+    "@radix-ui/react-slot": "^1.2.4",
+    "@types/node": "^25.0.2",
+    "@xenova/transformers": "^2.17.2",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.561.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tailwind-merge": "^3.4.0"
+  }
+}
