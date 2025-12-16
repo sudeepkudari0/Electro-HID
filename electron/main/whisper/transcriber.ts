@@ -1,9 +1,7 @@
-import { createRequire } from 'module';
 import path from 'path';
 import { app } from 'electron';
 
-// Use createRequire to import CommonJS modules in ESM context
-const require = createRequire(import.meta.url);
+// In CommonJS, require is available natively
 const whisperPkg = require('@lumen-labs-dev/whisper-node');
 const whisper = whisperPkg.whisper || whisperPkg.default;
 

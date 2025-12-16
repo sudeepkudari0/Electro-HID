@@ -1,9 +1,8 @@
 import { BrowserWindow } from 'electron';
 import path from 'path';
-import { fileURLToPath } from 'url';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// In CommonJS, __dirname is available natively
+declare const __dirname: string;
 
 export function createMainWindow(): BrowserWindow {
     const mainWindow = new BrowserWindow({

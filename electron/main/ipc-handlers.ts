@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron';
-import { getTranscriber } from './whisper/transcriber.js';
-import { IPC_CHANNELS } from '../types/ipc.js';
+import { getTranscriber } from './whisper/transcriber';
+import { IPC_CHANNELS } from '../types/ipc';
 
 export function registerIPCHandlers(): void {
     console.log('Registering IPC handlers...');
