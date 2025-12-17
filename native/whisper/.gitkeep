@@ -1,1 +1,23 @@
-Place whisper.exe (GPU-enabled binary) here
+GPU-Enabled Whisper.cpp Setup
+==============================
+
+Build Source: C:\whisper.cpp\build\bin\Release
+
+Required Files:
+1. whisper.exe (whisper-cli.exe renamed)
+
+2. Core DLLs:
+   - whisper.dll
+   - ggml.dll
+   - ggml-base.dll
+   - ggml-cpu.dll
+   - ggml-cuda.dll (114MB - GPU backend!)
+
+3. CUDA Runtime DLLs (from CUDA Toolkit v12.5):
+   - cudart64_12.dll (555KB)
+   - cublas64_12.dll (101MB)
+   - cublasLt64_12.dll (478MB)
+
+Total size: ~664MB (optimized for GPU acceleration)
+Removed unnecessary: nvrtc, nvJitLink DLLs (not needed for inference)
+Without these DLLs, whisper.exe will fail with error 0xC0000135.
