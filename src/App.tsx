@@ -222,6 +222,24 @@ function App(): JSX.Element {
     console.log('Chat clicked');
   };
 
+  // Control window click-through behavior
+  // When only header is visible, window ignores mouse in transparent areas
+  useEffect(() => {
+    const updateClickThrough = async () => {
+      try {
+        const hasContent = transcript || showAnswerWindow;
+        // When there's no content (only header), ignore mouse events in transparent areas
+        await window.electronAPI.setIgnoreMouseEvents(!hasContent);
+      } catch (error) {
+        console.error('Failed to set ignore mouse events:', error);
+      }
+    };
+
+    updateClickThrough();
+  }, [transcript, showAnswerWindow]);
+
+
+
   return (
     <div className="h-screen w-full bg-transparent overflow-hidden">
       {/* Header Overlay - Always visible */}

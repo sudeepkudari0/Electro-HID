@@ -32,4 +32,5 @@ export const IPC_CHANNELS = {
     WHISPER_STATUS: 'whisper:status',
     WHISPER_PROGRESS: 'whisper:progress',
     GET_DESKTOP_SOURCES: 'get-desktop-sources',
+    SET_IGNORE_MOUSE_EVENTS: 'window:set-ignore-mouse-events',
 } as const;

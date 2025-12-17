@@ -6,6 +6,7 @@ const IPC_CHANNELS = {
     WHISPER_TRANSCRIBE: 'whisper:transcribe',
     WHISPER_STATUS: 'whisper:status',
     GET_DESKTOP_SOURCES: 'get-desktop-sources',
+    SET_IGNORE_MOUSE_EVENTS: 'window:set-ignore-mouse-events',
 } as const;
 
 // Expose protected methods to renderer process
@@ -17,6 +18,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getDesktopSources: async () => {
         console.log('[Preload] getDesktopSources called');
         return await ipcRenderer.invoke(IPC_CHANNELS.GET_DESKTOP_SOURCES);
+    },
+
+    // Window control API
+    setIgnoreMouseEvents: async (ignore: boolean) => {
+        console.log('[Preload] setIgnoreMouseEvents called with:', ignore);
+        return await ipcRenderer.invoke(IPC_CHANNELS.SET_IGNORE_MOUSE_EVENTS, ignore);
     },
 
     // Whisper API

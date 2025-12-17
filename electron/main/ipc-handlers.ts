@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron';
 import { getTranscriber } from './whisper/transcriber';
 import { IPC_CHANNELS } from '../types/ipc';
+import { BrowserWindow } from 'electron';
 
 export function registerIPCHandlers(): void {
     console.log('Registering IPC handlers...');
@@ -110,6 +111,27 @@ export function registerIPCHandlers(): void {
             return {
                 success: false,
                 text: '',
+                error: error instanceof Error ? error.message : 'Unknown error',
+            };
+        }
+    });
+
+    // Window: Set ignore mouse events (for click-through behavior)
+    ipcMain.handle(IPC_CHANNELS.SET_IGNORE_MOUSE_EVENTS, async (event, ignore: boolean) => {
+        try {
+            const window = BrowserWindow.fromWebContents(event.sender);
+            if (window) {
+                // When ignore is true, mouse events pass through transparent areas
+                // The 'forward' option allows mouse events to be forwarded to elements beneath
+                window.setIgnoreMouseEvents(ignore, { forward: true });
+                console.log(`IPC: Window ignore mouse events set to ${ignore}`);
+                return { success: true };
+            }
+            return { success: false, error: 'No window found' };
+        } catch (error) {
+            console.error('IPC: Failed to set ignore mouse events:', error);
+            return {
+                success: false,
                 error: error instanceof Error ? error.message : 'Unknown error',
             };
         }

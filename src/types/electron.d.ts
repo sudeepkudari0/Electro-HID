@@ -24,6 +24,7 @@ interface DesktopSource {
 interface ElectronAPI {
     platform: string;
     getDesktopSources: () => Promise<DesktopSource[]>;
+    setIgnoreMouseEvents: (ignore: boolean) => Promise<{ success: boolean; error?: string }>;
     whisper: WhisperAPI;
 }
 
