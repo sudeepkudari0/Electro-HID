@@ -25,10 +25,6 @@ export function useWhisper(): UseWhisperReturn {
         setModelError('');
 
         try {
-            console.log('Loading Whisper model via IPC...');
-            console.log('window.electronAPI:', window.electronAPI);
-            console.log('window.electronAPI.whisper:', window.electronAPI?.whisper);
-
             if (!window.electronAPI || !window.electronAPI.whisper) {
                 throw new Error('Electron API not available. Preload script may not have loaded correctly.');
             }
@@ -37,7 +33,6 @@ export function useWhisper(): UseWhisperReturn {
 
             if (result.success) {
                 setIsModelLoaded(true);
-                console.log('Whisper model loaded successfully');
             } else {
                 throw new Error(result.error || 'Failed to load model');
             }
@@ -60,12 +55,7 @@ export function useWhisper(): UseWhisperReturn {
             }
 
             try {
-                console.log(`Transcribing ${audioData.length} audio samples via IPC...`);
-
                 const result = await window.electronAPI.whisper.transcribe(audioData);
-                console.log('IPC result:', result);
-                console.log('result.success:', result.success);
-                console.log('result.text:', result.text);
 
                 if (result.success) {
                     return result.text;

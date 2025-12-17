@@ -103,7 +103,6 @@ function App(): JSX.Element {
           /\b(what|how|why|when|where|who|tell me|describe|explain|can you)\b/i.test(transcript);
 
         if (isQuestion) {
-          console.log('Question detected:', transcript);
           handleGenerateAnswer(transcript);
         }
       }
@@ -214,12 +213,10 @@ function App(): JSX.Element {
 
   const handleAnalyzeScreen = () => {
     // TODO: Implement screen analysis
-    console.log('Analyze screen clicked');
   };
 
   const handleOpenChat = () => {
     // TODO: Implement chat interface
-    console.log('Chat clicked');
   };
 
   // Control window click-through behavior

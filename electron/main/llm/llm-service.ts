@@ -73,8 +73,6 @@ export class LLMService {
 
         // Initialize the appropriate client
         this.initializeClient();
-
-        console.log(`LLMService initialized with provider: ${this.config.provider}, model: ${this.config.model}`);
     }
 
     /**

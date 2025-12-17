@@ -21,7 +21,6 @@ export class WhisperTranscriber {
             : path.join(process.cwd(), 'native');
 
         this.whisperExe = path.join(resources, 'whisper', 'whisper.exe');
-        console.log('Whisper executable path:', this.whisperExe);
     }
 
     async initialize(modelName: string = 'base.en'): Promise<void> {
@@ -31,8 +30,6 @@ export class WhisperTranscriber {
         }
 
         try {
-            console.log(`Initializing Whisper with model: ${modelName}`);
-
             this.modelName = modelName;
             const modelPath = await this.ensureModel(modelName);
             this.modelPath = modelPath;
@@ -44,7 +41,6 @@ export class WhisperTranscriber {
 
             try {
                 await fs.access(this.whisperExe);
-                console.log('✓ Whisper executable found');
             } catch {
                 throw new Error(`Whisper executable not found at: ${this.whisperExe}\n\nPlease build/download whisper.cpp and place whisper.exe in native/whisper/`);
             }
@@ -52,13 +48,11 @@ export class WhisperTranscriber {
             // Verify model exists
             try {
                 await fs.access(modelPath);
-                console.log('✓ Model file found');
             } catch {
                 console.warn(`Model file not found at: ${modelPath}\nWill need to download model`);
             }
 
             this.isInitialized = true;
-            console.log('Whisper initialized successfully');
         } catch (error) {
             console.error('Failed to initialize Whisper:', error);
             throw error;
@@ -88,11 +82,6 @@ export class WhisperTranscriber {
             // Save temporarily
             const tempPath = path.join(app.getPath('temp'), `whisper-${Date.now()}.wav`);
             await fs.writeFile(tempPath, wavBuffer);
-
-            console.log('=== Whisper GPU Configuration ===');
-            console.log('Whisper.exe:', this.whisperExe);
-            console.log('Model:', this.modelPath);
-            console.log('Audio file:', tempPath);
 
             // Transcribe using native whisper.cpp binary
             const result = await this.runWhisperProcess(tempPath);
@@ -150,9 +139,6 @@ export class WhisperTranscriber {
                     console.error(`❌ Whisper failed (exit code ${code})`);
                     reject(new Error(`Whisper exited with code ${code}\n${stderr}`));
                 } else {
-                    // Log GPU status
-                    console.log(gpuDetected ? '🎮 GPU: ENABLED' : '⚠️ GPU: NOT DETECTED (CPU mode)');
-
                     // Extract transcription
                     const lines = stdout.split('\n');
                     const transcriptionLines = lines.filter(line =>
@@ -161,7 +147,6 @@ export class WhisperTranscriber {
                     );
                     const transcription = transcriptionLines.join(' ').trim();
 
-                    console.log('✓ Transcribed:', transcription.substring(0, 80) + '...');
                     resolve(transcription);
                 }
             });

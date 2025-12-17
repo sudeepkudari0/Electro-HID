@@ -25,8 +25,6 @@ export function useMixedAudioRecorder(
 
     const startRecording = useCallback(async () => {
         try {
-            console.log('Starting mixed audio recording (mic + system)...');
-
             // Get microphone stream
             const micStream = await navigator.mediaDevices.getUserMedia({
                 audio: {
@@ -37,11 +35,8 @@ export function useMixedAudioRecorder(
                 },
             });
 
-            console.log('Microphone stream acquired');
-
             // Get desktop sources
             const sources = await window.electronAPI.getDesktopSources();
-            console.log('Desktop sources:', sources);
 
             // Use the first screen source (entire screen audio)
             const screenSource = sources.find(s => s.type === 'screen');
@@ -51,8 +46,6 @@ export function useMixedAudioRecorder(
                 setupRecorder(micStream);
                 return;
             }
-
-            console.log('Using screen source:', screenSource.name);
 
             // Get system audio stream using Electron's desktopCapturer
             const systemStream = await (navigator.mediaDevices as any).getUserMedia({
@@ -73,8 +66,6 @@ export function useMixedAudioRecorder(
                     },
                 },
             });
-
-            console.log('System audio stream acquired');
 
             // Create audio context for mixing
             const audioContext = new AudioContext({ sampleRate: 16000 });
@@ -101,8 +92,6 @@ export function useMixedAudioRecorder(
             micGain.connect(destination);
             systemGain.connect(destination);
 
-            console.log('Audio mixer configured (Mic: 100%, System: 30%)');
-
             // Use the mixed stream
             const mixedStream = destination.stream;
             mixedStreamRef.current = mixedStream;
@@ -126,7 +115,6 @@ export function useMixedAudioRecorder(
             mediaRecorder.ondataavailable = (event) => {
                 if (event.data.size > 0) {
                     audioChunksRef.current.push(event.data);
-                    console.log('Audio chunk received:', event.data.size, 'bytes');
 
                     // Notify parent component if callback provided - use ref to get latest version
                     if (onDataAvailableRef.current) {
@@ -138,14 +126,10 @@ export function useMixedAudioRecorder(
             // Start recording with timeslice (3 seconds)
             mediaRecorder.start(3000);
             setIsRecording(true);
-
-            console.log('Recording started with mixed audio');
         }
     }, []); // No dependencies needed since we use refs
 
     const stopRecording = useCallback(() => {
-        console.log('Stopping mixed recording...');
-
         if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
             mediaRecorderRef.current.stop();
         }
@@ -162,8 +146,6 @@ export function useMixedAudioRecorder(
 
         mediaRecorderRef.current = null;
         setIsRecording(false);
-
-        console.log('Mixed recording stopped');
     }, []);
 
     const clearChunks = useCallback(() => {

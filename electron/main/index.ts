@@ -14,15 +14,11 @@ let mainWindow: BrowserWindow | null = null;
 
 // Initialize app
 app.whenReady().then(() => {
-    console.log('App is ready, initializing...');
-
     // Register IPC handlers before creating window
     registerIPCHandlers();
 
     // Create main window
     mainWindow = createMainWindow();
-
-    console.log('Main window created');
 
     app.on('activate', () => {
         // On macOS, recreate window when dock icon is clicked
@@ -42,6 +38,5 @@ app.on('window-all-closed', () => {
 
 // Handle app closing
 app.on('before-quit', () => {
-    console.log('App is quitting...');
     // Cleanup if needed;
 });

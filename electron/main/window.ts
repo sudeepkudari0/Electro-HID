@@ -29,11 +29,6 @@ export function createMainWindow(): BrowserWindow {
     const isPackaged = app.isPackaged;
     const isDev = !isPackaged && process.env.NODE_ENV !== 'production';
 
-    console.log('Is Packaged:', isPackaged);
-    console.log('Is Dev:', isDev);
-    console.log('Preload path:', path.join(__dirname, '../preload/index.cjs'));
-    console.log('__dirname:', __dirname);
-
     // Enable content protection (excludes from screen capture on Windows)
     // mainWindow.setContentProtection(true);
 
@@ -50,20 +45,17 @@ export function createMainWindow(): BrowserWindow {
 
     // Show window when ready to prevent blank/invisible window
     mainWindow.once('ready-to-show', () => {
-        console.log('Window ready to show');
         mainWindow.show();
     });
 
     // Load the app
     if (isDev) {
-        console.log('Loading dev URL: http://localhost:5173');
         mainWindow.loadURL('http://localhost:5173');
         // Open DevTools in development for debugging
         mainWindow.webContents.openDevTools({ mode: 'detach' });
     } else {
         // In production, the path is relative to the app.asar or app folder
         const indexPath = path.join(__dirname, '../../dist/index.html');
-        console.log('Loading production file:', indexPath);
         mainWindow.loadFile(indexPath);
 
         // For debugging packaged app - remove this after testing
@@ -71,10 +63,10 @@ export function createMainWindow(): BrowserWindow {
         // mainWindow.webContents.openDevTools({ mode: 'detach' });
     }
 
-    // Log when content finishes loading
-    mainWindow.webContents.on('did-finish-load', () => {
-        console.log('Content finished loading');
-    });
+    // Log when content finishes loading (for debugging)
+    // mainWindow.webContents.on('did-finish-load', () => {
+    //     console.log('Content finished loading');
+    // });
 
     // Log any load failures
     mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
