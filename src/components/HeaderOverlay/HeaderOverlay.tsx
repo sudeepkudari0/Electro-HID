@@ -44,7 +44,7 @@ export function HeaderOverlay({
                     className="relative p-2 hover:bg-white/10 rounded-full transition-colors"
                     title="Notifications"
                 >
-                    <Bell className="w-4 h-4 text-white" />
+                    <Bell className="w-2 h-2 text-white" />
                     {hasNotification && (
                         <div className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
                     )}
@@ -58,9 +58,9 @@ export function HeaderOverlay({
                     title={isRecording ? 'Stop Recording' : 'Start Recording'}
                 >
                     {isRecording ? (
-                        <Mic className="w-4 h-4 text-red-400" />
+                        <Mic className="w-2 h-2 text-red-400" />
                     ) : (
-                        <MicOff className="w-4 h-4 text-white" />
+                        <MicOff className="w-2 h-2 text-white" />
                     )}
                 </button>
 
@@ -70,8 +70,8 @@ export function HeaderOverlay({
                     className="flex flex-row items-center gap-2 px-4 py-1.5 bg-[#3A3A3A] hover:bg-[#4A4A4A] rounded-full transition-colors"
                     title="AI Help"
                 >
-                    <Sparkles className="w-4 h-4 text-white" />
-                    <span className="text-white text-sm font-medium">AI Help</span>
+                    <Sparkles className="w-2 h-2 text-white" />
+                    <span className="text-white text-xs text-nowrap font-medium">AI Help</span>
                 </button>
 
                 {/* Analyze Screen Button */}
@@ -80,8 +80,8 @@ export function HeaderOverlay({
                     className="flex flex-row items-center gap-2 px-4 py-1.5 bg-[#3A3A3A] hover:bg-[#4A4A4A] rounded-full transition-colors"
                     title="Analyze Screen"
                 >
-                    <Monitor className="w-4 h-4 text-white" />
-                    <span className="text-white text-sm font-medium">Analyze Screen</span>
+                    <Monitor className="w-2 h-2 text-white" />
+                    <span className="text-white text-xs text-nowrap font-medium">Analyze Screen</span>
                 </button>
 
                 {/* Chat Button */}
@@ -90,14 +90,14 @@ export function HeaderOverlay({
                     className="flex flex-row items-center gap-2 px-4 py-1.5 bg-[#3A3A3A] hover:bg-[#4A4A4A] rounded-full transition-colors"
                     title="Chat"
                 >
-                    <MessageSquare className="w-4 h-4 text-white" />
-                    <span className="text-white text-sm font-medium">Chat</span>
+                    <MessageSquare className="w-2 h-2 text-white" />
+                    <span className="text-white text-xs text-nowrap font-medium">Chat</span>
                 </button>
 
                 {/* Timer */}
                 <div className="flex items-center gap-2 px-3 py-1.5 bg-[#3A3A3A] rounded-full">
-                    <div className="w-4 h-4 bg-white rounded-sm" />
-                    <span className="text-white text-sm font-mono font-medium">
+                    <div className="w-2 h-2 bg-white rounded-sm" />
+                    <span className="text-white text-xs text-nowrap font-mono font-medium">
                         {formatTime(sessionTime)}
                     </span>
                 </div>

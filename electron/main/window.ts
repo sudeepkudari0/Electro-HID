@@ -28,7 +28,7 @@ export function createMainWindow(): BrowserWindow {
     console.log('__dirname:', __dirname);
 
     // Enable content protection (excludes from screen capture on Windows)
-    mainWindow.setContentProtection(true);
+    // mainWindow.setContentProtection(true);
 
     // Grant media permissions for audio capture
     mainWindow.webContents.session.setPermissionRequestHandler(
