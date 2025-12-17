@@ -1,138 +1,272 @@
-import { useState, useCallback, useRef } from 'react';
-import { AudioRecorder } from './components/AudioRecorder/AudioRecorder';
-import { TranscriptDisplay } from './components/TranscriptDisplay/TranscriptDisplay';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { HeaderOverlay } from './components/HeaderOverlay/HeaderOverlay';
+import { TranscriptionBar } from './components/TranscriptionBar/TranscriptionBar';
+import { AnswerWindow, QAPair } from './components/AnswerWindow/AnswerWindow';
 import { useWhisper } from './hooks/useWhisper';
 import { useMixedAudioRecorder } from './hooks/useMixedAudioRecorder';
+import { useLLM } from './hooks/useLLM';
 
 function App(): JSX.Element {
+  // Transcription state
   const [transcript, setTranscript] = useState<string>('');
-  const [isTranscribing, setIsTranscribing] = useState(false);
   const lastProcessedChunkRef = useRef(0);
 
+  // Q&A state
+  const [qaPairs, setQAPairs] = useState<QAPair[]>([]);
+  const [currentQAIndex, setCurrentQAIndex] = useState(0);
+  const [showAnswerWindow, setShowAnswerWindow] = useState(false);
+
+  // Question detection state
+  const lastTranscriptRef = useRef<string>('');
+  const questionDetectionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Session timer (in seconds)
+  const [sessionTime, setSessionTime] = useState(0);
+  const sessionTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Hooks
   const { isModelLoading, isModelLoaded, modelError, loadModel, transcribe } = useWhisper();
+  const { generateInterviewAnswer } = useLLM();
 
   // Real-time audio processing callback
   const handleAudioData = useCallback(async (chunks: Blob[]) => {
-    console.log('handleAudioData called with', chunks.length, 'chunks');
-    console.log('lastProcessedChunkRef.current:', lastProcessedChunkRef.current);
-    console.log('isModelLoaded:', isModelLoaded);
-
-    // Only process if we have new chunks
-    if (chunks.length <= lastProcessedChunkRef.current) {
-      console.log('Skipping - no new chunks');
+    if (chunks.length <= lastProcessedChunkRef.current || !isModelLoaded) {
       return;
     }
 
-    if (!isModelLoaded) {
-      console.log('Skipping - model not loaded');
-      return;
-    }
-
-    setIsTranscribing(true);
     try {
-      console.log('Processing audio - total chunks:', chunks.length, 'new:', chunks.length - lastProcessedChunkRef.current);
-
-      // Combine ALL chunks into a single blob (not just new ones)
-      // This is necessary because WebM chunks need the header from the first chunk
       const audioBlob = new Blob(chunks, { type: 'audio/webm;codecs=opus' });
-      console.log('Total audio blob size:', audioBlob.size);
-
-      // Convert blob to ArrayBuffer
       const arrayBuffer = await audioBlob.arrayBuffer();
-
-      // Decode ALL audio data using Web Audio API
       const audioContext = new AudioContext({ sampleRate: 16000 });
       const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-
-      // Get ALL audio samples as Float32Array (mono channel)
       const allAudioData = audioBuffer.getChannelData(0);
-      console.log('Total audio samples decoded:', allAudioData.length);
 
-      // Calculate how many samples we've already processed
-      // Assuming each chunk is roughly 3 seconds at 16kHz = 48000 samples
       const samplesPerChunk = 48000;
       const alreadyProcessedSamples = lastProcessedChunkRef.current * samplesPerChunk;
-
-      // Extract only the NEW audio samples
       const newAudioData = allAudioData.slice(alreadyProcessedSamples);
-      console.log('New audio samples to transcribe:', newAudioData.length);
 
       if (newAudioData.length === 0) {
-        console.log('No new audio samples to process');
         lastProcessedChunkRef.current = chunks.length;
         return;
       }
 
-      // Transcribe only the new portion in real-time
       const result = await transcribe(newAudioData);
-      console.log('Real-time transcription result:', result);
-
-      // Update the processed chunk count
       lastProcessedChunkRef.current = chunks.length;
 
-      // Append to existing transcript
       if (result && result.trim()) {
         setTranscript(prev => prev ? `${prev} ${result}` : result);
       }
     } catch (error) {
       console.error('Failed to transcribe chunk:', error);
-      // Don't show alert for real-time errors, just log them
     } finally {
-      setIsTranscribing(false);
+      // Transcription complete
     }
   }, [isModelLoaded, transcribe]);
 
   const { isRecording, startRecording, stopRecording, clearChunks } = useMixedAudioRecorder(handleAudioData);
 
-  const handleStart = async () => {
-    try {
-      // Load model if not loaded
-      if (!isModelLoaded) {
-        await loadModel();
+  // Start session timer when recording starts
+  useEffect(() => {
+    if (isRecording) {
+      sessionTimerRef.current = setInterval(() => {
+        setSessionTime(prev => prev + 1);
+      }, 1000);
+    } else {
+      if (sessionTimerRef.current) {
+        clearInterval(sessionTimerRef.current);
+        sessionTimerRef.current = null;
       }
+    }
 
-      // Reset state
+    return () => {
+      if (sessionTimerRef.current) {
+        clearInterval(sessionTimerRef.current);
+      }
+    };
+  }, [isRecording]);
+
+  // Question detection: Detect when user stops talking (2 second pause)
+  useEffect(() => {
+    if (transcript === lastTranscriptRef.current) return;
+
+    // Clear existing timer
+    if (questionDetectionTimerRef.current) {
+      clearTimeout(questionDetectionTimerRef.current);
+    }
+
+    // Set new timer to detect question after 2 seconds of silence
+    questionDetectionTimerRef.current = setTimeout(() => {
+      if (transcript && transcript !== lastTranscriptRef.current) {
+        // Detect if transcript ends with question mark or contains question words
+        const isQuestion =
+          transcript.endsWith('?') ||
+          /\b(what|how|why|when|where|who|tell me|describe|explain|can you)\b/i.test(transcript);
+
+        if (isQuestion) {
+          console.log('Question detected:', transcript);
+          handleGenerateAnswer(transcript);
+        }
+      }
+      lastTranscriptRef.current = transcript;
+    }, 2000);
+
+    return () => {
+      if (questionDetectionTimerRef.current) {
+        clearTimeout(questionDetectionTimerRef.current);
+      }
+    };
+  }, [transcript]);
+
+  // Generate AI answer for detected question
+  const handleGenerateAnswer = async (question: string) => {
+    if (!question.trim()) return;
+
+    // Create new Q&A pair with streaming placeholder
+    const newQA: QAPair = {
+      id: Date.now().toString(),
+      question,
+      answer: '',
+      timestamp: new Date(),
+      isStreaming: true,
+    };
+
+    setQAPairs(prev => [...prev, newQA]);
+    setCurrentQAIndex(qaPairs.length);
+    setShowAnswerWindow(true);
+
+    try {
+      // Stream the answer
+      let streamedAnswer = '';
+      await generateInterviewAnswer(
+        question,
+        undefined, // TODO: Add resume context
+        (chunk) => {
+          streamedAnswer += chunk;
+          // Update the Q&A pair with streamed content
+          setQAPairs(prev =>
+            prev.map(qa =>
+              qa.id === newQA.id
+                ? { ...qa, answer: streamedAnswer, isStreaming: true }
+                : qa
+            )
+          );
+        }
+      );
+
+      // Mark streaming as complete
+      setQAPairs(prev =>
+        prev.map(qa =>
+          qa.id === newQA.id
+            ? { ...qa, isStreaming: false }
+            : qa
+        )
+      );
+
+      // Clear the question transcript after generating answer
       setTranscript('');
-      lastProcessedChunkRef.current = 0;
-      clearChunks();
-
-      // Start recording
-      await startRecording();
     } catch (error) {
-      console.error('Failed to start:', error);
-      alert('Failed to start: ' + (error as Error).message);
+      console.error('Failed to generate answer:', error);
+      // Remove failed Q&A
+      setQAPairs(prev => prev.filter(qa => qa.id !== newQA.id));
     }
   };
 
-  const handleStop = () => {
-    stopRecording();
-    setIsTranscribing(false);
+  // Handler functions
+  const handleToggleRecording = async () => {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      try {
+        if (!isModelLoaded) {
+          await loadModel();
+        }
+        setTranscript('');
+        lastProcessedChunkRef.current = 0;
+        clearChunks();
+        await startRecording();
+      } catch (error) {
+        console.error('Failed to start:', error);
+      }
+    }
+  };
+
+  const handleClearTranscript = () => {
+    setTranscript('');
+    lastTranscriptRef.current = '';
+  };
+
+  const handleClearQA = () => {
+    setQAPairs([]);
+    setCurrentQAIndex(0);
+    setShowAnswerWindow(false);
+  };
+
+  const handleNavigateQA = (index: number) => {
+    setCurrentQAIndex(Math.max(0, Math.min(index, qaPairs.length - 1)));
+  };
+
+  const handleAIHelp = () => {
+    // Manual trigger for AI help
+    if (transcript) {
+      handleGenerateAnswer(transcript);
+    }
+  };
+
+  const handleAnalyzeScreen = () => {
+    // TODO: Implement screen analysis
+    console.log('Analyze screen clicked');
+  };
+
+  const handleOpenChat = () => {
+    // TODO: Implement chat interface
+    console.log('Chat clicked');
   };
 
   return (
-    <div className="h-screen w-full flex items-center justify-center p-4 bg-gradient-to-br from-purple-600/20 via-pink-500/20 to-blue-600/20">
-      <div className="w-full max-w-2xl h-80 bg-black/40 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/10 overflow-hidden">
-        <div className="h-full flex flex-col p-6 gap-4">
-          {/* Header with controls */}
-          <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-white">Voice Transcription</h1>
-            <AudioRecorder
-              isRecording={isRecording}
-              isModelLoading={isModelLoading}
-              onStart={handleStart}
-              onStop={handleStop}
-            />
-          </div>
+    <div className="h-screen w-full bg-transparent overflow-hidden">
+      {/* Header Overlay - Always visible */}
+      <HeaderOverlay
+        isRecording={isRecording}
+        onToggleRecording={handleToggleRecording}
+        onAIHelp={handleAIHelp}
+        onAnalyzeScreen={handleAnalyzeScreen}
+        onOpenChat={handleOpenChat}
+        sessionTime={sessionTime}
+      />
 
-          {/* Transcript display */}
-          <TranscriptDisplay
-            transcript={transcript}
-            isLoading={isModelLoading}
-            isTranscribing={isTranscribing}
-            error={modelError}
-          />
+      {/* Transcription Bar - Shows when there's transcript */}
+      {transcript && (
+        <TranscriptionBar
+          transcript={transcript}
+          onClear={handleClearTranscript}
+          onClose={handleClearTranscript}
+        />
+      )}
+
+      {/* Answer Window - Shows when there are Q&A pairs */}
+      {showAnswerWindow && qaPairs.length > 0 && (
+        <AnswerWindow
+          qaPairs={qaPairs}
+          currentIndex={currentQAIndex}
+          onNavigate={handleNavigateQA}
+          onClear={handleClearQA}
+          onClose={() => setShowAnswerWindow(false)}
+        />
+      )}
+
+      {/* Loading indicator */}
+      {isModelLoading && (
+        <div className="fixed bottom-4 right-4 bg-[#2A2A2A] px-4 py-3 rounded-lg shadow-xl border border-white/10">
+          <p className="text-white text-sm">Loading Whisper model...</p>
         </div>
-      </div>
+      )}
+
+      {/* Error display */}
+      {modelError && (
+        <div className="fixed bottom-4 right-4 bg-red-500/20 border border-red-500 px-4 py-3 rounded-lg shadow-xl">
+          <p className="text-red-200 text-sm">{modelError}</p>
+        </div>
+      )}
     </div>
   );
 }

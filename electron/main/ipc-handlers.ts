@@ -87,5 +87,33 @@ export function registerIPCHandlers(): void {
         }
     });
 
+    // LLM: Generate response
+    ipcMain.handle('llm:generate', async (event, options: {
+        systemPrompt: string;
+        prompt: string;
+        temperature?: number;
+        maxTokens?: number;
+        stream?: boolean;
+    }) => {
+        try {
+            console.log('IPC: Generating LLM response');
+            const { getLLMService } = await import('./llm/llm-service');
+            const llmService = getLLMService();
+
+            const result = await llmService.generate(options);
+            return {
+                success: true,
+                ...result,
+            };
+        } catch (error) {
+            console.error('IPC: LLM generation failed:', error);
+            return {
+                success: false,
+                text: '',
+                error: error instanceof Error ? error.message : 'Unknown error',
+            };
+        }
+    });
+
     console.log('IPC handlers registered successfully');
 }

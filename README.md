@@ -1,14 +1,17 @@
-# Electro-HID - Voice Transcription Overlay
+# Electro-HID - AI Interview Assistant
 
-A frameless, transparent overlay Electron app with local speech recognition using Whisper.cpp.
+A privacy-first, offline AI interview assistant with real-time speech recognition and intelligent answer suggestions. Built with Electron, React, Whisper.cpp, and Llama.cpp.
 
-## Features
+## ✨ Features
 
-- 🎤 **Local Speech Recognition** - Runs 100% offline using native Whisper.cpp
-- 🪟 **Overlay Window** - Frameless, transparent, always-on-top
-- ⚡ **Modern Stack** - Electron + Vite + React + TypeScript
-- 🎨 **Beautiful UI** - Tailwind CSS + shadcn/ui components
-- 🧪 **E2E Testing** - Playwright for comprehensive testing
+- 🎤 **Local Speech Recognition** - Real-time transcription using Whisper.cpp (100% offline)
+- 🤖 **AI Answer Generation** - Get professional interview answers using local LLM (Llama.cpp)
+- 🪟 **Glassmorphism Overlays** - Beautiful, transparent UI inspired by Parakeet AI
+- 🎯 **Auto Question Detection** - Automatically detects when interviewer stops talking
+- 📝 **Q&A History** - Navigate through multiple interview questions and answers
+- ⏱️ **Session Timer** - Track your interview duration
+- 🎨 **Modern UI** - Sleek design with backdrop blur and dark theme
+- 🔒 **Privacy First** - Everything runs locally, no data leaves your machine
 
 ## Project Structure
 
