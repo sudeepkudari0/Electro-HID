@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron';
+import { ipcMain, app } from 'electron';
 import { getTranscriber } from './whisper/transcriber';
 import { IPC_CHANNELS } from '../types/ipc';
 import { BrowserWindow } from 'electron';
@@ -244,6 +244,20 @@ Be clear, structured, and helpful.`;
             return { success: false, error: 'No window found' };
         } catch (error) {
             console.error('IPC: Failed to resize window:', error);
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error',
+            };
+        }
+    });
+
+    // App: Quit application
+    ipcMain.handle(IPC_CHANNELS.QUIT_APP, async () => {
+        try {
+            app.quit();
+            return { success: true };
+        } catch (error) {
+            console.error('IPC: Failed to quit app:', error);
             return {
                 success: false,
                 error: error instanceof Error ? error.message : 'Unknown error',

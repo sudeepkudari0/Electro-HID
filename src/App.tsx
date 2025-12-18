@@ -17,9 +17,9 @@ interface WindowSize {
 // Window size configurations for different states
 const WINDOW_SIZES: Record<string, WindowSize> = {
   headerOnly: { width: OVERLAY_WIDTH, height: OVERLAY_HEIGHT },
-  withTranscript: { width: 1000, height: 150 },
+  withTranscript: { width: 800, height: 150 },
   withAnswerWindow: { width: 800, height: 600 },
-  withBoth: { width: 1000, height: 700 },
+  withBoth: { width: 800, height: 700 },
   analyzeModal: { width: 800, height: 300 },
 };
 
@@ -322,6 +322,10 @@ function App(): JSX.Element {
     setShowAnswerWindow(false);
   };
 
+  const handleCloseApp = () => {
+    window.electronAPI?.quitApp();
+  };
+
 
 
   return (
@@ -333,6 +337,7 @@ function App(): JSX.Element {
         onAIHelp={handleAIHelp}
         onAnalyzeScreen={handleAnalyzeScreen}
         onOpenChat={handleOpenChat}
+        onClose={handleCloseApp}
         sessionTime={sessionTime}
       />
 

@@ -11,6 +11,7 @@ const IPC_CHANNELS = {
     CAPTURE_SCREEN: 'screen:capture',
     ANALYZE_SCREEN: 'screen:analyze',
     RESIZE_WINDOW: 'window:resize',
+    QUIT_APP: 'app:quit',
 } as const;
 
 // Expose protected methods to renderer process
@@ -65,6 +66,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Window resize API
     resizeWindow: async (width: number, height: number) => {
         return await ipcRenderer.invoke(IPC_CHANNELS.RESIZE_WINDOW, width, height);
+    },
+
+    // App control API
+    quitApp: async () => {
+        return await ipcRenderer.invoke(IPC_CHANNELS.QUIT_APP);
     },
 });
 

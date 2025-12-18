@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Mic, MicOff, Bell, Sparkles, Monitor, MessageSquare, MoreVertical, Plus, ChevronUp } from 'lucide-react';
+import { Mic, MicOff, Bell, Sparkles, Monitor, MessageSquare, MoreVertical, X, ChevronUp } from 'lucide-react';
 import { OVERLAY_WIDTH, OVERLAY_HEIGHT } from '../../constants/overlay-dimensions';
 
 interface HeaderOverlayProps {
@@ -8,6 +8,7 @@ interface HeaderOverlayProps {
     onAIHelp: () => void;
     onAnalyzeScreen: () => void;
     onOpenChat: () => void;
+    onClose: () => void;
     sessionTime: number; // in seconds
 }
 
@@ -17,6 +18,7 @@ export function HeaderOverlay({
     onAIHelp,
     onAnalyzeScreen,
     onOpenChat,
+    onClose,
     sessionTime,
 }: HeaderOverlayProps) {
     const [hasNotification, setHasNotification] = useState(true);
@@ -36,11 +38,6 @@ export function HeaderOverlay({
                 height: `${OVERLAY_HEIGHT}px`,
             }}
         >
-            {/* 
-                Using -webkit-app-region: drag for native window dragging.
-                This is the recommended approach for Electron frameless windows.
-                It's smoother and more consistent than JS-based mouse tracking.
-            */}
             <div
                 className="bg-black/30 backdrop-blur-xl rounded-full px-4 py-2 flex items-center gap-3 shadow-2xl border border-white/20 pointer-events-auto"
                 style={{
@@ -125,22 +122,14 @@ export function HeaderOverlay({
                     </span>
                 </div>
 
-                {/* More Options - non-draggable (clickable) */}
+                {/* Close App - non-draggable (clickable) */}
                 <button
-                    className="p-2 hover:bg-white/10 rounded-full transition-colors"
+                    onClick={onClose}
+                    className="p-2 hover:bg-red-500/20 rounded-full transition-colors"
                     style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-                    title="More Options"
+                    title="Close App"
                 >
-                    <MoreVertical className="w-4 h-4 text-white" />
-                </button>
-
-                {/* Add New - non-draggable (clickable) */}
-                <button
-                    className="p-2 hover:bg-white/10 rounded-full transition-colors"
-                    style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-                    title="Add New"
-                >
-                    <Plus className="w-4 h-4 text-white" />
+                    <X className="w-4 h-4 text-white hover:text-red-400" />
                 </button>
 
                 {/* Minimize - non-draggable (clickable) */}

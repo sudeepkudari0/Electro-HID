@@ -61,4 +61,5 @@ export const IPC_CHANNELS = {
     CAPTURE_SCREEN: 'screen:capture',
     ANALYZE_SCREEN: 'screen:analyze',
     RESIZE_WINDOW: 'window:resize',
+    QUIT_APP: 'app:quit',
 } as const;

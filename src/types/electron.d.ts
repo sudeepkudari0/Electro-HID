@@ -35,6 +35,7 @@ interface ElectronAPI {
         extractedText?: string;
         error?: string;
     }>;
+    quitApp: () => Promise<{ success: boolean; error?: string }>;
 }
 
 declare global {
