@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
 import { Mic, MicOff, Bell, Sparkles, Monitor, MessageSquare, MoreVertical, Plus, ChevronUp } from 'lucide-react';
 import { OVERLAY_WIDTH, OVERLAY_HEIGHT } from '../../constants/overlay-dimensions';
 
@@ -21,11 +21,6 @@ export function HeaderOverlay({
 }: HeaderOverlayProps) {
     const [hasNotification, setHasNotification] = useState(true);
 
-    // Dragging state
-    const [isDragging, setIsDragging] = useState(false);
-    const [isHovering, setIsHovering] = useState(false);
-    const lastMousePosRef = useRef({ x: 0, y: 0 });
-
     // Format time as MM:SS
     const formatTime = (seconds: number): string => {
         const mins = Math.floor(seconds / 60);
@@ -33,81 +28,27 @@ export function HeaderOverlay({
         return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     };
 
-    // Handle drag start
-    const handleMouseDown = (e: React.MouseEvent) => {
-        // Don't start dragging if clicking on a button
-        if ((e.target as HTMLElement).closest('button')) {
-            return;
-        }
-
-        setIsDragging(true);
-        lastMousePosRef.current = { x: e.screenX, y: e.screenY };
-        e.preventDefault();
-    };
-
-    // Global mouse move and mouse up handlers
-    useEffect(() => {
-        if (!isDragging) return;
-
-        const handleMouseMove = (e: MouseEvent) => {
-            const deltaX = e.screenX - lastMousePosRef.current.x;
-            const deltaY = e.screenY - lastMousePosRef.current.y;
-
-            if (deltaX !== 0 || deltaY !== 0) {
-                // Fire and forget for smooth dragging (don't await)
-                window.electronAPI?.moveWindow(deltaX, deltaY).catch(console.error);
-                lastMousePosRef.current = { x: e.screenX, y: e.screenY };
-            }
-        };
-
-        const handleMouseUp = () => {
-            setIsDragging(false);
-        };
-
-        window.addEventListener('mousemove', handleMouseMove);
-        window.addEventListener('mouseup', handleMouseUp);
-
-        return () => {
-            window.removeEventListener('mousemove', handleMouseMove);
-            window.removeEventListener('mouseup', handleMouseUp);
-        };
-    }, [isDragging]);
-
-    // Handle mouse enter/leave for the header div
-    const handleMouseEnter = () => {
-        setIsHovering(true);
-        // window.electronAPI?.setIgnoreMouseEvents(false).catch(console.error);
-    };
-
-    const handleMouseLeave = () => {
-        setIsHovering(false);
-        // Re-enable click-through when leaving header (unless dragging)
-        if (!isDragging) {
-            // window.electronAPI?.setIgnoreMouseEvents(true).catch(console.error);
-        }
-    };
-
-    // When dragging stops, restore click-through if not hovering
-    useEffect(() => {
-        if (!isDragging && !isHovering) {
-            // window.electronAPI?.setIgnoreMouseEvents(true).catch(console.error);
-        }
-    }, [isDragging, isHovering]);
-
     return (
         <div
-            className="fixed top-0 left-0 z-50 select-none"
+            className="fixed top-0 left-0 z-50 select-none pointer-events-none"
             style={{
-                cursor: isDragging ? 'grabbing' : 'grab',
                 width: `${OVERLAY_WIDTH}px`,
                 height: `${OVERLAY_HEIGHT}px`,
             }}
-            onMouseDown={handleMouseDown}
-            onMouseEnter={handleMouseEnter}
-            onMouseLeave={handleMouseLeave}
         >
-            <div className="bg-black/30 backdrop-blur-xl rounded-full px-4 py-2 flex items-center gap-3 shadow-2xl border border-white/20">
-                {/* Logo & Brand */}
+            {/* 
+                Using -webkit-app-region: drag for native window dragging.
+                This is the recommended approach for Electron frameless windows.
+                It's smoother and more consistent than JS-based mouse tracking.
+            */}
+            <div
+                className="bg-black/30 backdrop-blur-xl rounded-full px-4 py-2 flex items-center gap-3 shadow-2xl border border-white/20 pointer-events-auto"
+                style={{
+                    WebkitAppRegion: 'drag',
+                    cursor: 'grab',
+                } as React.CSSProperties}
+            >
+                {/* Logo & Brand - draggable area */}
                 <div className="flex items-center gap-2 pr-3 border-r border-white/10">
                     <div className="w-8 h-8 bg-gradient-to-br from-green-400 to-green-600 rounded-lg flex items-center justify-center">
                         <span className="text-white text-lg font-bold">E</span>
@@ -115,10 +56,11 @@ export function HeaderOverlay({
                     <span className="text-white font-semibold text-sm">ElectroHID</span>
                 </div>
 
-                {/* Notification Bell */}
+                {/* Notification Bell - non-draggable (clickable) */}
                 <button
                     onClick={() => setHasNotification(false)}
                     className="relative p-2 hover:bg-white/10 rounded-full transition-colors"
+                    style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
                     title="Notifications"
                 >
                     <Bell className="w-4 h-4 text-white" />
@@ -127,11 +69,12 @@ export function HeaderOverlay({
                     )}
                 </button>
 
-                {/* Microphone Toggle */}
+                {/* Microphone Toggle - non-draggable (clickable) */}
                 <button
                     onClick={onToggleRecording}
                     className={`p-2 rounded-full transition-colors ${isRecording ? 'bg-red-500/20 hover:bg-red-500/30' : 'hover:bg-white/10'
                         }`}
+                    style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
                     title={isRecording ? 'Stop Recording' : 'Start Recording'}
                 >
                     {isRecording ? (
@@ -141,37 +84,40 @@ export function HeaderOverlay({
                     )}
                 </button>
 
-                {/* AI Help Button */}
+                {/* AI Help Button - non-draggable (clickable) */}
                 <button
                     onClick={onAIHelp}
                     className="flex flex-row items-center gap-2 px-4 py-1.5 bg-[#3A3A3A] hover:bg-[#4A4A4A] rounded-full transition-colors"
+                    style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
                     title="AI Help"
                 >
                     <Sparkles className="w-4 h-4 text-white" />
                     <span className="text-white text-xs text-nowrap font-medium">AI Help</span>
                 </button>
 
-                {/* Analyze Screen Button */}
+                {/* Analyze Screen Button - non-draggable (clickable) */}
                 <button
                     onClick={onAnalyzeScreen}
                     className="flex flex-row items-center gap-2 px-4 py-1.5 bg-[#3A3A3A] hover:bg-[#4A4A4A] rounded-full transition-colors"
+                    style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
                     title="Analyze Screen"
                 >
                     <Monitor className="w-4 h-4 text-white" />
                     <span className="text-white text-xs text-nowrap font-medium">Analyze Screen</span>
                 </button>
 
-                {/* Chat Button */}
+                {/* Chat Button - non-draggable (clickable) */}
                 <button
                     onClick={onOpenChat}
                     className="flex flex-row items-center gap-2 px-4 py-1.5 bg-[#3A3A3A] hover:bg-[#4A4A4A] rounded-full transition-colors"
+                    style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
                     title="Chat"
                 >
                     <MessageSquare className="w-4 h-4 text-white" />
                     <span className="text-white text-xs text-nowrap font-medium">Chat</span>
                 </button>
 
-                {/* Timer */}
+                {/* Timer - draggable area (not a button) */}
                 <div className="flex items-center gap-2 px-3 py-1.5 bg-[#3A3A3A] rounded-full">
                     <div className="w-4 h-4 bg-white rounded-sm" />
                     <span className="text-white text-xs text-nowrap font-mono font-medium">
@@ -179,25 +125,28 @@ export function HeaderOverlay({
                     </span>
                 </div>
 
-                {/* More Options */}
+                {/* More Options - non-draggable (clickable) */}
                 <button
                     className="p-2 hover:bg-white/10 rounded-full transition-colors"
+                    style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
                     title="More Options"
                 >
                     <MoreVertical className="w-4 h-4 text-white" />
                 </button>
 
-                {/* Add New */}
+                {/* Add New - non-draggable (clickable) */}
                 <button
                     className="p-2 hover:bg-white/10 rounded-full transition-colors"
+                    style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
                     title="Add New"
                 >
                     <Plus className="w-4 h-4 text-white" />
                 </button>
 
-                {/* Minimize */}
+                {/* Minimize - non-draggable (clickable) */}
                 <button
                     className="p-2 hover:bg-white/10 rounded-full transition-colors"
+                    style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
                     title="Minimize"
                 >
                     <ChevronUp className="w-4 h-4 text-white" />

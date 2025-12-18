@@ -16,8 +16,6 @@ export function createMainWindow(): BrowserWindow {
     // Calculate centered x position
     const centeredX = Math.round((screenWidth - OVERLAY_WIDTH) / 2);
 
-    console.log(`Screen width: ${screenWidth}, Overlay width: ${OVERLAY_WIDTH}, Centered X: ${centeredX}`);
-
     const mainWindow = new BrowserWindow({
         width: OVERLAY_WIDTH,
         height: OVERLAY_HEIGHT,
