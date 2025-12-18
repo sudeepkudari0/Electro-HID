@@ -19,7 +19,8 @@ const WINDOW_SIZES: Record<string, WindowSize> = {
   headerOnly: { width: OVERLAY_WIDTH, height: OVERLAY_HEIGHT },
   withTranscript: { width: 1000, height: 150 },
   withAnswerWindow: { width: 800, height: 600 },
-  withBoth: { width: 1000, height: 700 }, // Transcript + Answer visible
+  withBoth: { width: 1000, height: 700 },
+  analyzeModal: { width: 800, height: 300 },
 };
 
 function App(): JSX.Element {
@@ -47,27 +48,31 @@ function App(): JSX.Element {
   const { isModelLoading, isModelLoaded, modelError, loadModel, transcribe } = useWhisper();
   const { generateInterviewAnswer } = useLLM();
 
-  // Centralized window resize based on visible components
-  // Note: AnalyzeScreenModal handles its own resize since it's a full modal
-  useEffect(() => {
-    // Don't resize if analyze modal is open (it handles its own sizing)
-    if (showAnalyzeModal) return;
+  // Helper function to resize window based on current/future state
+  // Call this BEFORE changing state to ensure window is ready
+  const resizeWindowForState = useCallback((options: {
+    hasTranscript?: boolean;
+    hasAnswerWindow?: boolean;
+    hasAnalyzeModal?: boolean;
+  }) => {
+    const { hasTranscript = false, hasAnswerWindow = false, hasAnalyzeModal = false } = options;
 
-    const hasTranscript = !!transcript;
-    const hasAnswerWindow = showAnswerWindow && qaPairs.length > 0;
+    let targetSize: WindowSize;
 
-    let targetSize = WINDOW_SIZES.headerOnly;
-
-    if (hasTranscript && hasAnswerWindow) {
+    if (hasAnalyzeModal) {
+      targetSize = WINDOW_SIZES.analyzeModal;
+    } else if (hasTranscript && hasAnswerWindow) {
       targetSize = WINDOW_SIZES.withBoth;
     } else if (hasAnswerWindow) {
       targetSize = WINDOW_SIZES.withAnswerWindow;
     } else if (hasTranscript) {
       targetSize = WINDOW_SIZES.withTranscript;
+    } else {
+      targetSize = WINDOW_SIZES.headerOnly;
     }
 
-    window.electronAPI?.resizeWindow(targetSize.width, targetSize.height).catch(console.error);
-  }, [transcript, showAnswerWindow, qaPairs.length, showAnalyzeModal]);
+    return window.electronAPI?.resizeWindow(targetSize.width, targetSize.height);
+  }, []);
 
   // Real-time audio processing callback
   const handleAudioData = useCallback(async (chunks: Blob[]) => {
@@ -161,6 +166,12 @@ function App(): JSX.Element {
   const handleGenerateAnswer = async (question: string) => {
     if (!question.trim()) return;
 
+    // Resize window BEFORE showing the answer window
+    await resizeWindowForState({
+      hasTranscript: !!transcript,
+      hasAnswerWindow: true,
+    });
+
     // Create new Q&A pair with streaming placeholder
     const newQA: QAPair = {
       id: Date.now().toString(),
@@ -230,12 +241,22 @@ function App(): JSX.Element {
     }
   };
 
-  const handleClearTranscript = () => {
+  const handleClearTranscript = async () => {
+    // Resize window based on what will remain visible
+    await resizeWindowForState({
+      hasTranscript: false,
+      hasAnswerWindow: showAnswerWindow && qaPairs.length > 0,
+    });
     setTranscript('');
     lastTranscriptRef.current = '';
   };
 
-  const handleClearQA = () => {
+  const handleClearQA = async () => {
+    // Resize window before hiding answer window
+    await resizeWindowForState({
+      hasTranscript: !!transcript,
+      hasAnswerWindow: false,
+    });
     setQAPairs([]);
     setCurrentQAIndex(0);
     setShowAnswerWindow(false);
@@ -252,15 +273,28 @@ function App(): JSX.Element {
     }
   };
 
-  const handleAnalyzeScreen = () => {
+  const handleAnalyzeScreen = async () => {
+    // Resize window BEFORE showing the modal
+    await resizeWindowForState({ hasAnalyzeModal: true });
     setShowAnalyzeModal(true);
   };
 
-  const handleCloseAnalyzeModal = () => {
+  const handleCloseAnalyzeModal = async () => {
+    // Resize window back based on current visible content
+    await resizeWindowForState({
+      hasTranscript: !!transcript,
+      hasAnswerWindow: showAnswerWindow && qaPairs.length > 0,
+    });
     setShowAnalyzeModal(false);
   };
 
-  const handleAnalyzeComplete = (answer: string) => {
+  const handleAnalyzeComplete = async (answer: string) => {
+    // Resize for answer window (modal will close, so we need answer window size)
+    await resizeWindowForState({
+      hasTranscript: !!transcript,
+      hasAnswerWindow: true,
+    });
+
     // Create a new Q&A pair from the analyzed screen
     const newQA: QAPair = {
       id: Date.now().toString(),
@@ -277,6 +311,15 @@ function App(): JSX.Element {
 
   const handleOpenChat = () => {
     // TODO: Implement chat interface
+  };
+
+  const handleCloseAnswerWindow = async () => {
+    // Resize window before hiding answer window
+    await resizeWindowForState({
+      hasTranscript: !!transcript,
+      hasAnswerWindow: false,
+    });
+    setShowAnswerWindow(false);
   };
 
 
@@ -309,7 +352,7 @@ function App(): JSX.Element {
           currentIndex={currentQAIndex}
           onNavigate={handleNavigateQA}
           onClear={handleClearQA}
-          onClose={() => setShowAnswerWindow(false)}
+          onClose={handleCloseAnswerWindow}
         />
       )}
 
