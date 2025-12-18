@@ -1,16 +1,28 @@
-import { BrowserWindow, app } from 'electron';
+import { BrowserWindow, app, screen } from 'electron';
 import path from 'path';
-import { OVERLAY_WIDTH, OVERLAY_HEIGHT } from '../../src/constants/overlay-dimensions';
+
+// Overlay dimensions - keep in sync with src/constants/overlay-dimensions.ts
+const OVERLAY_WIDTH = 1000;
+const OVERLAY_HEIGHT = 80;
 
 // In CommonJS, __dirname is available natively
 declare const __dirname: string;
 
 export function createMainWindow(): BrowserWindow {
+    // Get primary display dimensions to center the window
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const { width: screenWidth } = primaryDisplay.workAreaSize;
+
+    // Calculate centered x position
+    const centeredX = Math.round((screenWidth - OVERLAY_WIDTH) / 2);
+
+    console.log(`Screen width: ${screenWidth}, Overlay width: ${OVERLAY_WIDTH}, Centered X: ${centeredX}`);
+
     const mainWindow = new BrowserWindow({
         width: OVERLAY_WIDTH,
         height: OVERLAY_HEIGHT,
-        x: 0,
-        y: 0,
+        x: centeredX,
+        y: 16,  // Small offset from top
         frame: false,
         transparent: true,
         alwaysOnTop: true,

@@ -96,7 +96,7 @@ export function HeaderOverlay({
 
     return (
         <div
-            className="fixed top-4 left-1/2 -translate-x-1/2 z-50 select-none"
+            className="fixed top-0 left-0 z-50 select-none"
             style={{
                 cursor: isDragging ? 'grabbing' : 'grab',
                 width: `${OVERLAY_WIDTH}px`,
