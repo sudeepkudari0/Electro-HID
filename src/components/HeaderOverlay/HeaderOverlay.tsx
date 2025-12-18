@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Mic, MicOff, Bell, Sparkles, Monitor, MessageSquare, MoreVertical, Plus, ChevronUp } from 'lucide-react';
 
 interface HeaderOverlayProps {
@@ -20,6 +20,11 @@ export function HeaderOverlay({
 }: HeaderOverlayProps) {
     const [hasNotification, setHasNotification] = useState(true);
 
+    // Dragging state
+    const [isDragging, setIsDragging] = useState(false);
+    const [isHovering, setIsHovering] = useState(false);
+    const lastMousePosRef = useRef({ x: 0, y: 0 });
+
     // Format time as MM:SS
     const formatTime = (seconds: number): string => {
         const mins = Math.floor(seconds / 60);
@@ -27,17 +32,76 @@ export function HeaderOverlay({
         return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     };
 
+    // Handle drag start
+    const handleMouseDown = (e: React.MouseEvent) => {
+        // Don't start dragging if clicking on a button
+        if ((e.target as HTMLElement).closest('button')) {
+            return;
+        }
+
+        setIsDragging(true);
+        lastMousePosRef.current = { x: e.screenX, y: e.screenY };
+        e.preventDefault();
+    };
+
+    // Global mouse move and mouse up handlers
+    useEffect(() => {
+        if (!isDragging) return;
+
+        const handleMouseMove = (e: MouseEvent) => {
+            const deltaX = e.screenX - lastMousePosRef.current.x;
+            const deltaY = e.screenY - lastMousePosRef.current.y;
+
+            if (deltaX !== 0 || deltaY !== 0) {
+                // Fire and forget for smooth dragging (don't await)
+                window.electronAPI?.moveWindow(deltaX, deltaY).catch(console.error);
+                lastMousePosRef.current = { x: e.screenX, y: e.screenY };
+            }
+        };
+
+        const handleMouseUp = () => {
+            setIsDragging(false);
+        };
+
+        window.addEventListener('mousemove', handleMouseMove);
+        window.addEventListener('mouseup', handleMouseUp);
+
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, [isDragging]);
+
+    // Handle mouse enter/leave for the header div
+    const handleMouseEnter = () => {
+        setIsHovering(true);
+        window.electronAPI?.setIgnoreMouseEvents(false).catch(console.error);
+    };
+
+    const handleMouseLeave = () => {
+        setIsHovering(false);
+        // Re-enable click-through when leaving header (unless dragging)
+        if (!isDragging) {
+            window.electronAPI?.setIgnoreMouseEvents(true).catch(console.error);
+        }
+    };
+
+    // When dragging stops, restore click-through if not hovering
+    useEffect(() => {
+        if (!isDragging && !isHovering) {
+            window.electronAPI?.setIgnoreMouseEvents(true).catch(console.error);
+        }
+    }, [isDragging, isHovering]);
+
     return (
         <div
-            className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 select-none"
-            onMouseEnter={() => {
-                // Disable click-through when mouse enters header
-                window.electronAPI?.setIgnoreMouseEvents(false).catch(console.error);
+            className="fixed top-4 left-1/2 -translate-x-1/2 z-50 select-none"
+            style={{
+                cursor: isDragging ? 'grabbing' : 'grab',
             }}
-            onMouseLeave={() => {
-                // Re-enable click-through when mouse leaves header (if no content is showing)
-                window.electronAPI?.setIgnoreMouseEvents(true).catch(console.error);
-            }}
+            onMouseDown={handleMouseDown}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
         >
             <div className="bg-black/30 backdrop-blur-xl rounded-full px-4 py-2 flex items-center gap-3 shadow-2xl border border-white/20">
                 {/* Logo & Brand */}

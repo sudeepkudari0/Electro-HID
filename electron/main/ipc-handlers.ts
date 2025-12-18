@@ -130,4 +130,23 @@ export function registerIPCHandlers(): void {
         }
     });
 
+    // Window: Move window by delta (for custom drag implementation)
+    ipcMain.handle(IPC_CHANNELS.MOVE_WINDOW, async (event, deltaX: number, deltaY: number) => {
+        try {
+            const window = BrowserWindow.fromWebContents(event.sender);
+            if (window) {
+                const [currentX, currentY] = window.getPosition();
+                window.setPosition(currentX + deltaX, currentY + deltaY);
+                return { success: true };
+            }
+            return { success: false, error: 'No window found' };
+        } catch (error) {
+            console.error('IPC: Failed to move window:', error);
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error',
+            };
+        }
+    });
+
 }

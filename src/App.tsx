@@ -219,14 +219,17 @@ function App(): JSX.Element {
     // TODO: Implement chat interface
   };
 
-  // Control window click-through behavior
-  // When only header is visible, window ignores mouse in transparent areas
+  // Control window click-through behavior for content areas
+  // HeaderOverlay manages its own hover state, but when content appears, disable click-through
   useEffect(() => {
     const updateClickThrough = async () => {
       try {
         const hasContent = transcript || showAnswerWindow;
-        // When there's no content (only header), ignore mouse events in transparent areas
-        await window.electronAPI.setIgnoreMouseEvents(!hasContent);
+        // When there's content showing, disable click-through entirely
+        // When no content, HeaderOverlay will manage click-through on hover/leave
+        if (hasContent) {
+          await window.electronAPI.setIgnoreMouseEvents(false);
+        }
       } catch (error) {
         console.error('Failed to set ignore mouse events:', error);
       }
