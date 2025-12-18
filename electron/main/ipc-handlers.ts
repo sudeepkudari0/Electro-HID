@@ -110,7 +110,7 @@ export function registerIPCHandlers(): void {
         }
     });
 
-    // Window: Set ignore mouse events (for click-through behavior)
+    // // Window: Set ignore mouse events (for click-through behavior)
     ipcMain.handle(IPC_CHANNELS.SET_IGNORE_MOUSE_EVENTS, async (event, ignore: boolean) => {
         try {
             const window = BrowserWindow.fromWebContents(event.sender);
@@ -142,6 +142,75 @@ export function registerIPCHandlers(): void {
             return { success: false, error: 'No window found' };
         } catch (error) {
             console.error('IPC: Failed to move window:', error);
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error',
+            };
+        }
+    });
+
+    // Screen: Capture screenshot
+    ipcMain.handle(IPC_CHANNELS.CAPTURE_SCREEN, async (event, sourceId?: string) => {
+        try {
+            const { captureScreen } = await import('./screen-capture');
+            const imageData = await captureScreen(sourceId);
+
+            return {
+                success: true,
+                imageData,
+            };
+        } catch (error) {
+            console.error('IPC: Screen capture failed:', error);
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error',
+            };
+        }
+    });
+
+    // Screen: Analyze screenshot with LLM vision
+    ipcMain.handle(IPC_CHANNELS.ANALYZE_SCREEN, async (event, params: {
+        imageData: string;
+        prompt?: string;
+        context?: string;
+    }) => {
+        try {
+            const { getLLMService } = await import('./llm/llm-service');
+            const llmService = getLLMService();
+
+            // Build vision prompt
+            const systemPrompt = `You are an expert interview assistant analyzing a screenshot. 
+Extract relevant information from the image and provide a professional, concise answer.
+Focus on:
+- Text content (questions, code, problems)
+- Visual elements (diagrams, charts, UI)
+- Context and meaning
+
+Be clear, structured, and helpful.`;
+
+            const userPrompt = params.prompt ||
+                `Analyze this screenshot from an interview. Extract any questions, problems, or important information, and provide a professional answer or explanation.`;
+
+            const fullPrompt = params.context
+                ? `${userPrompt}\n\nAdditional Context:\n${params.context}`
+                : userPrompt;
+
+            // Generate answer with vision
+            const result = await llmService.generate({
+                systemPrompt,
+                prompt: fullPrompt,
+                imageData: params.imageData,
+                temperature: 0.7,
+                maxTokens: 1024,
+                stream: false,
+            });
+
+            return {
+                success: true,
+                answer: result.text,
+            };
+        } catch (error) {
+            console.error('IPC: Screen analysis failed:', error);
             return {
                 success: false,
                 error: error instanceof Error ? error.message : 'Unknown error',

@@ -8,6 +8,8 @@ const IPC_CHANNELS = {
     GET_DESKTOP_SOURCES: 'get-desktop-sources',
     SET_IGNORE_MOUSE_EVENTS: 'window:set-ignore-mouse-events',
     MOVE_WINDOW: 'window:move',
+    CAPTURE_SCREEN: 'screen:capture',
+    ANALYZE_SCREEN: 'screen:analyze',
 } as const;
 
 // Expose protected methods to renderer process
@@ -44,6 +46,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
         getStatus: async () => {
             return await ipcRenderer.invoke(IPC_CHANNELS.WHISPER_STATUS);
         },
+    },
+
+    // Screen API
+    captureScreen: async (sourceId?: string) => {
+        return await ipcRenderer.invoke(IPC_CHANNELS.CAPTURE_SCREEN, sourceId);
+    },
+
+    analyzeScreen: async (imageData: string, prompt?: string, context?: string) => {
+        return await ipcRenderer.invoke(IPC_CHANNELS.ANALYZE_SCREEN, {
+            imageData,
+            prompt,
+            context,
+        });
     },
 });
 

@@ -1,29 +1,31 @@
 import { BrowserWindow, app } from 'electron';
 import path from 'path';
+import { OVERLAY_WIDTH, OVERLAY_HEIGHT } from '../../src/constants/overlay-dimensions';
 
 // In CommonJS, __dirname is available natively
 declare const __dirname: string;
 
 export function createMainWindow(): BrowserWindow {
     const mainWindow = new BrowserWindow({
-        width: 700,
-        height: 300,
-        x: 100,
-        y: 100,
+        width: OVERLAY_WIDTH,
+        height: OVERLAY_HEIGHT,
+        x: 0,
+        y: 0,
         frame: false,
         transparent: true,
         alwaysOnTop: true,
         skipTaskbar: true,
         resizable: false,
         backgroundColor: '#00000000',
-        show: false, // Don't show until ready
+        show: false,
+        focusable: true,
         webPreferences: {
             preload: path.join(__dirname, '../preload/index.cjs'),
             contextIsolation: true,
             nodeIntegration: false,
-            sandbox: false, // Required for some native modules
         },
     });
+
 
     // Use app.isPackaged for more reliable production detection
     const isPackaged = app.isPackaged;

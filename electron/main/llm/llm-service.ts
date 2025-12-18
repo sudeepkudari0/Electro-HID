@@ -15,6 +15,7 @@ export interface LLMOptions {
     temperature?: number;
     maxTokens?: number;
     stream?: boolean;
+    imageData?: string; // Base64 encoded image for vision APIs
 }
 
 /**
@@ -43,8 +44,8 @@ export class LLMService {
 
     // Default models
     private static readonly DEFAULT_MODELS = {
-        openai: 'gpt-5.1', // Fast and cost-effective
-        gemini: 'gemini-2.0-flash-exp', // Latest fast model
+        openai: 'gpt-4o', // Supports vision
+        gemini: 'gemini-2.0-flash-exp', // Supports vision
     };
 
     constructor(config?: Partial<LLMConfig>) {
@@ -137,13 +138,34 @@ export class LLMService {
             throw new Error('OpenAI client not initialized');
         }
 
+        // Build messages array
+        const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+            { role: 'system', content: options.systemPrompt },
+        ];
+
+        // If image data is provided, use vision format
+        if (options.imageData) {
+            messages.push({
+                role: 'user',
+                content: [
+                    { type: 'text', text: options.prompt },
+                    {
+                        type: 'image_url',
+                        image_url: {
+                            url: `data:image/png;base64,${options.imageData}`,
+                        },
+                    },
+                ],
+            });
+        } else {
+            messages.push({ role: 'user', content: options.prompt });
+        }
+
         const response = await this.openaiClient.chat.completions.create({
             model: this.config.model!,
-            messages: [
-                { role: 'system', content: options.systemPrompt },
-                { role: 'user', content: options.prompt },
-            ],
+            messages,
             temperature: options.temperature ?? 0.7,
+            max_tokens: options.maxTokens,
         });
 
         return response.choices[0]?.message?.content || '';
@@ -157,13 +179,34 @@ export class LLMService {
             throw new Error('OpenAI client not initialized');
         }
 
+        // Build messages array
+        const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+            { role: 'system', content: options.systemPrompt },
+        ];
+
+        // If image data is provided, use vision format
+        if (options.imageData) {
+            messages.push({
+                role: 'user',
+                content: [
+                    { type: 'text', text: options.prompt },
+                    {
+                        type: 'image_url',
+                        image_url: {
+                            url: `data:image/png;base64,${options.imageData}`,
+                        },
+                    },
+                ],
+            });
+        } else {
+            messages.push({ role: 'user', content: options.prompt });
+        }
+
         const stream = await this.openaiClient.chat.completions.create({
             model: this.config.model!,
-            messages: [
-                { role: 'system', content: options.systemPrompt },
-                { role: 'user', content: options.prompt },
-            ],
+            messages,
             temperature: options.temperature ?? 0.7,
+            max_tokens: options.maxTokens,
             stream: true,
         });
 
@@ -183,9 +226,22 @@ export class LLMService {
             throw new Error('Gemini client not initialized');
         }
 
+        // Build content parts
+        const contentParts: any[] = [{ text: options.prompt }];
+
+        // If image data is provided, add it as inline data
+        if (options.imageData) {
+            contentParts.push({
+                inlineData: {
+                    mimeType: 'image/png',
+                    data: options.imageData,
+                },
+            });
+        }
+
         const response = await this.geminiClient.models.generateContent({
             model: this.config.model!,
-            contents: options.prompt,
+            contents: contentParts,
             config: {
                 systemInstruction: options.systemPrompt,
                 temperature: options.temperature ?? 0.7,
@@ -204,9 +260,22 @@ export class LLMService {
             throw new Error('Gemini client not initialized');
         }
 
+        // Build content parts
+        const contentParts: any[] = [{ text: options.prompt }];
+
+        // If image data is provided, add it as inline data
+        if (options.imageData) {
+            contentParts.push({
+                inlineData: {
+                    mimeType: 'image/png',
+                    data: options.imageData,
+                },
+            });
+        }
+
         const stream = await this.geminiClient.models.generateContentStream({
             model: this.config.model!,
-            contents: options.prompt,
+            contents: contentParts,
             config: {
                 systemInstruction: options.systemPrompt,
                 temperature: options.temperature ?? 0.7,

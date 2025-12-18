@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { HeaderOverlay } from './components/HeaderOverlay/HeaderOverlay';
 import { TranscriptionBar } from './components/TranscriptionBar/TranscriptionBar';
 import { AnswerWindow, QAPair } from './components/AnswerWindow/AnswerWindow';
+import { AnalyzeScreenModal } from './components/AnalyzeScreen/AnalyzeScreenModal';
 import { useWhisper } from './hooks/useWhisper';
 import { useMixedAudioRecorder } from './hooks/useMixedAudioRecorder';
 import { useLLM } from './hooks/useLLM';
@@ -23,6 +24,9 @@ function App(): JSX.Element {
   // Session timer (in seconds)
   const [sessionTime, setSessionTime] = useState(0);
   const sessionTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Analyze screen modal state
+  const [showAnalyzeModal, setShowAnalyzeModal] = useState(false);
 
   // Hooks
   const { isModelLoading, isModelLoaded, modelError, loadModel, transcribe } = useWhisper();
@@ -212,31 +216,31 @@ function App(): JSX.Element {
   };
 
   const handleAnalyzeScreen = () => {
-    // TODO: Implement screen analysis
+    setShowAnalyzeModal(true);
+  };
+
+  const handleCloseAnalyzeModal = () => {
+    setShowAnalyzeModal(false);
+  };
+
+  const handleAnalyzeComplete = (answer: string) => {
+    // Create a new Q&A pair from the analyzed screen
+    const newQA: QAPair = {
+      id: Date.now().toString(),
+      question: 'Screen Analysis',
+      answer,
+      timestamp: new Date(),
+      isStreaming: false,
+    };
+
+    setQAPairs(prev => [...prev, newQA]);
+    setCurrentQAIndex(qaPairs.length);
+    setShowAnswerWindow(true);
   };
 
   const handleOpenChat = () => {
     // TODO: Implement chat interface
   };
-
-  // Control window click-through behavior for content areas
-  // HeaderOverlay manages its own hover state, but when content appears, disable click-through
-  useEffect(() => {
-    const updateClickThrough = async () => {
-      try {
-        const hasContent = transcript || showAnswerWindow;
-        // When there's content showing, disable click-through entirely
-        // When no content, HeaderOverlay will manage click-through on hover/leave
-        if (hasContent) {
-          await window.electronAPI.setIgnoreMouseEvents(false);
-        }
-      } catch (error) {
-        console.error('Failed to set ignore mouse events:', error);
-      }
-    };
-
-    updateClickThrough();
-  }, [transcript, showAnswerWindow]);
 
 
 
@@ -284,6 +288,14 @@ function App(): JSX.Element {
         <div className="fixed bottom-4 right-4 bg-red-500/20 border border-red-500 px-4 py-3 rounded-lg shadow-xl">
           <p className="text-red-200 text-sm">{modelError}</p>
         </div>
+      )}
+
+      {/* Analyze Screen Modal */}
+      {showAnalyzeModal && (
+        <AnalyzeScreenModal
+          onClose={handleCloseAnalyzeModal}
+          onAnalyze={handleAnalyzeComplete}
+        />
       )}
     </div>
   );

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Mic, MicOff, Bell, Sparkles, Monitor, MessageSquare, MoreVertical, Plus, ChevronUp } from 'lucide-react';
+import { OVERLAY_WIDTH, OVERLAY_HEIGHT } from '../../constants/overlay-dimensions';
 
 interface HeaderOverlayProps {
     isRecording: boolean;
@@ -75,21 +76,21 @@ export function HeaderOverlay({
     // Handle mouse enter/leave for the header div
     const handleMouseEnter = () => {
         setIsHovering(true);
-        window.electronAPI?.setIgnoreMouseEvents(false).catch(console.error);
+        // window.electronAPI?.setIgnoreMouseEvents(false).catch(console.error);
     };
 
     const handleMouseLeave = () => {
         setIsHovering(false);
         // Re-enable click-through when leaving header (unless dragging)
         if (!isDragging) {
-            window.electronAPI?.setIgnoreMouseEvents(true).catch(console.error);
+            // window.electronAPI?.setIgnoreMouseEvents(true).catch(console.error);
         }
     };
 
     // When dragging stops, restore click-through if not hovering
     useEffect(() => {
         if (!isDragging && !isHovering) {
-            window.electronAPI?.setIgnoreMouseEvents(true).catch(console.error);
+            // window.electronAPI?.setIgnoreMouseEvents(true).catch(console.error);
         }
     }, [isDragging, isHovering]);
 
@@ -98,6 +99,8 @@ export function HeaderOverlay({
             className="fixed top-4 left-1/2 -translate-x-1/2 z-50 select-none"
             style={{
                 cursor: isDragging ? 'grabbing' : 'grab',
+                width: `${OVERLAY_WIDTH}px`,
+                height: `${OVERLAY_HEIGHT}px`,
             }}
             onMouseDown={handleMouseDown}
             onMouseEnter={handleMouseEnter}
