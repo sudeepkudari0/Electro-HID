@@ -218,4 +218,37 @@ Be clear, structured, and helpful.`;
         }
     });
 
+    // Window: Resize window (for modals and overlays)
+    ipcMain.handle(IPC_CHANNELS.RESIZE_WINDOW, async (event, width: number, height: number) => {
+        try {
+            const window = BrowserWindow.fromWebContents(event.sender);
+            if (window) {
+                const { screen } = await import('electron');
+                const primaryDisplay = screen.getPrimaryDisplay();
+                const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
+
+                // Calculate centered position for the new size
+                const newX = Math.round((screenWidth - width) / 2);
+                const newY = Math.round((screenHeight - height) / 2);
+
+                // Set both size and position
+                window.setBounds({
+                    x: newX,
+                    y: Math.max(16, newY), // Keep at least 16px from top
+                    width: width,
+                    height: height,
+                });
+
+                return { success: true };
+            }
+            return { success: false, error: 'No window found' };
+        } catch (error) {
+            console.error('IPC: Failed to resize window:', error);
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error',
+            };
+        }
+    });
+
 }

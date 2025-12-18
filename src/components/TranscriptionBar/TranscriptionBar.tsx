@@ -26,8 +26,8 @@ export function TranscriptionBar({
     if (!transcript) return null;
 
     return (
-        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-40 w-[90%] max-w-5xl select-none">
-            <div className="bg-black/25 backdrop-blur-xl rounded-lg shadow-2xl border border-white/20 overflow-hidden">
+        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-40 w-[90%] max-w-5xl select-none pointer-events-none">
+            <div className="bg-black/25 backdrop-blur-xl rounded-lg shadow-2xl border border-white/20 overflow-hidden pointer-events-auto">
                 <div className="flex items-center">
                     {/* Transcript Text - Single line, horizontal scroll */}
                     <div

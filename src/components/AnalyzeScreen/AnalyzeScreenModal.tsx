@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, Loader2, Camera, Sparkles, Monitor } from 'lucide-react';
+import { OVERLAY_WIDTH, OVERLAY_HEIGHT } from '../../constants/overlay-dimensions';
 
 interface AnalyzeScreenModalProps {
     onClose: () => void;
@@ -12,6 +13,10 @@ interface DesktopSource {
     type: 'screen' | 'window';
 }
 
+// Modal dimensions - expand to show full modal
+const MODAL_WIDTH = 800;
+const MODAL_HEIGHT = 300;
+
 export function AnalyzeScreenModal({ onClose, onAnalyze }: AnalyzeScreenModalProps) {
     const [isCapturing, setIsCapturing] = useState(false);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -20,6 +25,17 @@ export function AnalyzeScreenModal({ onClose, onAnalyze }: AnalyzeScreenModalPro
     const [customPrompt, setCustomPrompt] = useState('');
     const [sources, setSources] = useState<DesktopSource[]>([]);
     const [selectedSource, setSelectedSource] = useState<string>('');
+
+    // Resize window when modal opens/closes
+    useEffect(() => {
+        // Expand window to show modal
+        window.electronAPI?.resizeWindow(MODAL_WIDTH, MODAL_HEIGHT).catch(console.error);
+
+        // Restore window size when modal closes
+        return () => {
+            window.electronAPI?.resizeWindow(OVERLAY_WIDTH, OVERLAY_HEIGHT).catch(console.error);
+        };
+    }, []);
 
     // Load available screen sources
     useEffect(() => {

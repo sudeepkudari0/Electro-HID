@@ -6,6 +6,21 @@ import { AnalyzeScreenModal } from './components/AnalyzeScreen/AnalyzeScreenModa
 import { useWhisper } from './hooks/useWhisper';
 import { useMixedAudioRecorder } from './hooks/useMixedAudioRecorder';
 import { useLLM } from './hooks/useLLM';
+import { OVERLAY_WIDTH, OVERLAY_HEIGHT } from './constants/overlay-dimensions';
+
+// Window size type
+interface WindowSize {
+  width: number;
+  height: number;
+}
+
+// Window size configurations for different states
+const WINDOW_SIZES: Record<string, WindowSize> = {
+  headerOnly: { width: OVERLAY_WIDTH, height: OVERLAY_HEIGHT },
+  withTranscript: { width: 1000, height: 150 },
+  withAnswerWindow: { width: 800, height: 600 },
+  withBoth: { width: 1000, height: 700 }, // Transcript + Answer visible
+};
 
 function App(): JSX.Element {
   // Transcription state
@@ -31,6 +46,28 @@ function App(): JSX.Element {
   // Hooks
   const { isModelLoading, isModelLoaded, modelError, loadModel, transcribe } = useWhisper();
   const { generateInterviewAnswer } = useLLM();
+
+  // Centralized window resize based on visible components
+  // Note: AnalyzeScreenModal handles its own resize since it's a full modal
+  useEffect(() => {
+    // Don't resize if analyze modal is open (it handles its own sizing)
+    if (showAnalyzeModal) return;
+
+    const hasTranscript = !!transcript;
+    const hasAnswerWindow = showAnswerWindow && qaPairs.length > 0;
+
+    let targetSize = WINDOW_SIZES.headerOnly;
+
+    if (hasTranscript && hasAnswerWindow) {
+      targetSize = WINDOW_SIZES.withBoth;
+    } else if (hasAnswerWindow) {
+      targetSize = WINDOW_SIZES.withAnswerWindow;
+    } else if (hasTranscript) {
+      targetSize = WINDOW_SIZES.withTranscript;
+    }
+
+    window.electronAPI?.resizeWindow(targetSize.width, targetSize.height).catch(console.error);
+  }, [transcript, showAnswerWindow, qaPairs.length, showAnalyzeModal]);
 
   // Real-time audio processing callback
   const handleAudioData = useCallback(async (chunks: Blob[]) => {

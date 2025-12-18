@@ -2,7 +2,7 @@ import { BrowserWindow, app, screen } from 'electron';
 import path from 'path';
 
 // Overlay dimensions - keep in sync with src/constants/overlay-dimensions.ts
-const OVERLAY_WIDTH = 1000;
+const OVERLAY_WIDTH = 800;
 const OVERLAY_HEIGHT = 80;
 
 // In CommonJS, __dirname is available natively

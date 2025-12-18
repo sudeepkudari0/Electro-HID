@@ -26,6 +26,7 @@ interface ElectronAPI {
     getDesktopSources: () => Promise<DesktopSource[]>;
     setIgnoreMouseEvents: (ignore: boolean) => Promise<{ success: boolean; error?: string }>;
     moveWindow: (deltaX: number, deltaY: number) => Promise<{ success: boolean; error?: string }>;
+    resizeWindow: (width: number, height: number) => Promise<{ success: boolean; error?: string }>;
     whisper: WhisperAPI;
     captureScreen: (sourceId?: string) => Promise<{ success: boolean; imageData?: string; error?: string }>;
     analyzeScreen: (imageData: string, prompt?: string, context?: string) => Promise<{

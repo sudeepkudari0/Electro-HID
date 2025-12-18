@@ -10,6 +10,7 @@ const IPC_CHANNELS = {
     MOVE_WINDOW: 'window:move',
     CAPTURE_SCREEN: 'screen:capture',
     ANALYZE_SCREEN: 'screen:analyze',
+    RESIZE_WINDOW: 'window:resize',
 } as const;
 
 // Expose protected methods to renderer process
@@ -59,6 +60,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
             prompt,
             context,
         });
+    },
+
+    // Window resize API
+    resizeWindow: async (width: number, height: number) => {
+        return await ipcRenderer.invoke(IPC_CHANNELS.RESIZE_WINDOW, width, height);
     },
 });
 

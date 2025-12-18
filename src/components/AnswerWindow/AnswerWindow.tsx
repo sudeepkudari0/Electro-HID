@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Trash2, X, MessageCircle, Star } from 'lucide-react';
 
 export interface QAPair {
@@ -57,7 +57,7 @@ export function AnswerWindow({
     };
 
     // Add/remove drag listeners
-    useState(() => {
+    useEffect(() => {
         if (isDragging) {
             window.addEventListener('mousemove', handleMouseMove);
             window.addEventListener('mouseup', handleMouseUp);
@@ -66,7 +66,7 @@ export function AnswerWindow({
             window.removeEventListener('mousemove', handleMouseMove);
             window.removeEventListener('mouseup', handleMouseUp);
         };
-    });
+    }, [isDragging, dragOffset]);
 
     // Format timestamp
     const formatTime = (date: Date): string => {
@@ -88,15 +88,19 @@ export function AnswerWindow({
 
     return (
         <div
-            className="fixed z-30 select-none"
+            className="fixed z-30 select-none pointer-events-none"
             style={{
                 left: `${position.x}px`,
                 top: `${position.y}px`,
-                cursor: isDragging ? 'grabbing' : 'grab',
             }}
-            onMouseDown={handleMouseDown}
         >
-            <div className="bg-black/40 backdrop-blur-2xl rounded-lg shadow-2xl border border-white/20 w-[600px] max-w-[90vw]">
+            <div
+                className="bg-black/40 backdrop-blur-2xl rounded-lg shadow-2xl border border-white/20 w-[600px] max-w-[90vw] pointer-events-auto"
+                style={{
+                    cursor: isDragging ? 'grabbing' : 'grab',
+                }}
+                onMouseDown={handleMouseDown}
+            >
                 {/* Header with navigation */}
                 <div className="flex items-center justify-between px-4 py-2 border-b border-white/10">
                     <div className="flex items-center gap-2">
