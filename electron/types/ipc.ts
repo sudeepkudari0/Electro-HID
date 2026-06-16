@@ -68,6 +68,7 @@ export const IPC_CHANNELS = {
     CHECK_STT_SERVER: 'server:check-stt',
     GET_AVAILABLE_MODELS: 'models:get-available',
     TEST_OLLAMA: 'ollama:test',
+    TEST_OPENAI: 'openai:test',
     QUIT_APP: 'app:quit',
     DOWNLOAD_WHISPER_MODEL: 'whisper:download-model',
     DOWNLOAD_MOONSHINE_MODEL: 'moonshine:download-model',
@@ -86,6 +87,8 @@ export const IPC_CHANNELS = {
     CAREER_RUN_JOBSPY: 'career:run-jobspy',
     CAREER_RUN_APPLY: 'career:run-apply',
     CAREER_STOP_APPLY: 'career:stop-apply',
+    CAREER_RUN_LOGIN: 'career:run-login',
+    CAREER_STOP_LOGIN: 'career:stop-login',
     // Window management
     SWITCH_TO_INTERVIEW: 'window:switch-interview',
     SWITCH_TO_DASHBOARD: 'window:switch-dashboard',

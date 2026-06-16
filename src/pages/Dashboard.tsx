@@ -155,7 +155,7 @@ export function Dashboard() {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 bg-[#0f1117] rounded-tl-2xl border-t border-l border-white/5 relative overflow-hidden" style={{ WebkitAppRegion: 'no-drag' } as any}>
+      <div className="flex-1 bg-[#0f1117] rounded-tl-2xl border-t border-l border-white/5 relative overflow-hidden select-text" style={{ WebkitAppRegion: 'no-drag' } as any}>
         <div className="absolute inset-0 overflow-auto">
           {activeModule === 'dashboard' && <OverviewPanel />}
           {activeModule === 'career-hub' && <CareerHub />}

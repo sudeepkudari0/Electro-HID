@@ -27,6 +27,7 @@ interface LLMConfig {
     useOllamaOnly: boolean;
     llmProvider: 'ollama' | 'openai';
     openaiApiKey: string;
+    openaiBaseUrl: string;
     openaiModel: string;
     resumeContext: string;
 }
@@ -61,6 +62,10 @@ export class LLMService {
 
         // Strip quotes if they exist in the env vars (fallback to env if not in settings)
         const cleanKey = (key?: string) => key?.replace(/^["']|["']$/g, '');
+        const cleanBaseUrl = (url?: string) => {
+            if (!url) return undefined;
+            return url.trim().replace(/\/chat\/completions\/?$/, '').replace(/\/completions\/?$/, '');
+        };
         const geminiApiKey = cleanKey(settings.geminiApiKey || process.env.GEMINI_API_KEY);
         const groqApiKey = cleanKey(settings.groqApiKey || process.env.GROQ_API_KEY);
 
@@ -81,8 +86,10 @@ export class LLMService {
             useOllamaOnly: settings.useOllamaOnly ?? false,
             llmProvider: settings.llmProvider || 'ollama',
             openaiApiKey: cleanKey(settings.openaiApiKey || process.env.OPENAI_API_KEY) || '',
+            openaiBaseUrl: cleanBaseUrl(settings.openaiBaseUrl || process.env.OPENAI_BASE_URL) || 'https://api.openai.com/v1',
             openaiModel: settings.openaiModel || 'gpt-4o-mini',
             resumeContext: settings.resumeContext || '',
+            ...config,
         };
 
         // Initialize Gemini
@@ -108,6 +115,7 @@ export class LLMService {
         if (this.config.openaiApiKey) {
             this.openaiClient = new OpenAI({
                 apiKey: this.config.openaiApiKey,
+                baseURL: this.config.openaiBaseUrl,
             });
         } else {
             this.openaiClient = null as any;

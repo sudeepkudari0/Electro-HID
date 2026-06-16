@@ -61,3 +61,8 @@ native/jobspy/__pycache__/
 native/jobspy/results.json
 native/jobspy/*.egg-info/
 native/jobspy/*.spec
+
+# browser-use-apply Python sidecar environment & cache
+native/browser-use-apply/venv/
+native/browser-use-apply/__pycache__/
+native/browser-use-apply/*.spec

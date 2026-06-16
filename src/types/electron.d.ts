@@ -103,6 +103,11 @@ interface ElectronAPI {
     message?: string;
     error?: string;
   }>;
+  testOpenAI: () => Promise<{
+    success: boolean;
+    message?: string;
+    error?: string;
+  }>;
   llmGetAvailableModels: (
     provider: "gemini" | "groq",
   ) => Promise<{ success: boolean; models?: string[]; error?: string }>;
@@ -146,6 +151,8 @@ interface ElectronAPI {
       dryRun?: boolean;
     }) => Promise<{ success: boolean; data?: any; error?: string }>;
     stopApply: () => Promise<{ success: boolean; error?: string }>;
+    runLogin: (site: 'linkedin' | 'default') => Promise<{ success: boolean; data?: any; error?: string }>;
+    stopLogin: () => Promise<{ success: boolean; error?: string }>;
     onApplyStatus: (callback: (eventData: {
       status: string;
       action?: string;

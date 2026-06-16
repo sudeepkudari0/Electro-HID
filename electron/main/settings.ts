@@ -30,11 +30,13 @@ export interface AppSettings {
     groqProxySmallModel: string;
     llmProvider: 'ollama' | 'openai';
     openaiApiKey: string;
+    openaiBaseUrl: string;
     openaiModel: string;
     resumeContext: string;
+    headlessApply: boolean;
 }
 
-const CURRENT_VERSION = 14;
+const CURRENT_VERSION = 16;
 
 const DEFAULT_SETTINGS: AppSettings = {
     version: CURRENT_VERSION,
@@ -64,8 +66,10 @@ const DEFAULT_SETTINGS: AppSettings = {
     groqProxySmallModel: 'llama-3.1-8b-instant',
     llmProvider: 'ollama',
     openaiApiKey: '',
+    openaiBaseUrl: 'https://api.openai.com/v1',
     openaiModel: 'gpt-4o-mini',
     resumeContext: '',
+    headlessApply: false,
 };
 
 // Migration map: version number -> transform function
@@ -185,6 +189,22 @@ const MIGRATIONS: Record<number, (settings: any) => any> = {
             openaiModel: settings.openaiModel || 'gpt-4o-mini',
             resumeContext: settings.resumeContext || '',
             version: 14,
+        };
+    },
+    14: (settings: any) => {
+        // v14 -> v15: Add OpenAI-compatible base URL setting
+        return {
+            ...settings,
+            openaiBaseUrl: settings.openaiBaseUrl || 'https://api.openai.com/v1',
+            version: 15,
+        };
+    },
+    15: (settings: any) => {
+        // v15 -> v16: Add headlessApply setting
+        return {
+            ...settings,
+            headlessApply: false,
+            version: 16,
         };
     },
 };

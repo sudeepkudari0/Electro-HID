@@ -15,6 +15,7 @@ const IPC_CHANNELS = {
     UPDATE_SETTINGS: 'settings:update',
     GET_AVAILABLE_MODELS: 'models:get-available',
     TEST_OLLAMA: 'ollama:test',
+    TEST_OPENAI: 'openai:test',
     QUIT_APP: 'app:quit',
     DOWNLOAD_WHISPER_MODEL: 'whisper:download-model',
     DOWNLOAD_MOONSHINE_MODEL: 'moonshine:download-model',
@@ -157,6 +158,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     testOllama: async () => {
         return await ipcRenderer.invoke(IPC_CHANNELS.TEST_OLLAMA);
     },
+    
+    testOpenAI: async () => {
+        return await ipcRenderer.invoke(IPC_CHANNELS.TEST_OPENAI);
+    },
 
     llmGetAvailableModels: async (provider: 'gemini' | 'groq') => {
         return await ipcRenderer.invoke('llm:get-available-models', provider);
@@ -207,6 +212,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
         fetchUrl: async (url: string) => ipcRenderer.invoke('career:fetch-url', url),
         runApply: async (options: any) => ipcRenderer.invoke('career:run-apply', options),
         stopApply: async () => ipcRenderer.invoke('career:stop-apply'),
+        runLogin: async (site: 'linkedin' | 'default') => ipcRenderer.invoke('career:run-login', site),
+        stopLogin: async () => ipcRenderer.invoke('career:stop-login'),
         onApplyStatus: (callback: (eventData: any) => void) => {
             const handler = (_event: any, data: any) => callback(data);
             ipcRenderer.on('career:apply-status', handler);

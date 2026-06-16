@@ -43,11 +43,14 @@ export function SettingsPanel({ onClose, onSettingsChanged }: SettingsPanelProps
         groqProxySmallModel: 'llama-3.1-8b-instant',
         llmProvider: 'ollama' as 'ollama' | 'openai',
         openaiApiKey: '',
+        openaiBaseUrl: 'https://api.openai.com/v1',
         openaiModel: 'gpt-4o-mini',
         resumeContext: ''
     });
     const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
     const [isTesting, setIsTesting] = useState(false);
+    const [openaiTestResult, setOpenaiTestResult] = useState<{ success: boolean; message: string } | null>(null);
+    const [isTestingOpenAI, setIsTestingOpenAI] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [saveSuccess, setSaveSuccess] = useState(false);
     const [downloadingModel, setDownloadingModel] = useState<string | null>(null);
@@ -198,6 +201,7 @@ export function SettingsPanel({ onClose, onSettingsChanged }: SettingsPanelProps
                     groqProxySmallModel: s.groqProxySmallModel || 'llama-3.1-8b-instant',
                     llmProvider: s.llmProvider || 'ollama',
                     openaiApiKey: s.openaiApiKey || '',
+                    openaiBaseUrl: s.openaiBaseUrl || 'https://api.openai.com/v1',
                     openaiModel: s.openaiModel || 'gpt-4o-mini',
                     resumeContext: s.resumeContext || ''
                 });
@@ -255,6 +259,25 @@ export function SettingsPanel({ onClose, onSettingsChanged }: SettingsPanelProps
             setTestResult({ success: false, message: `Test error: ${error}` });
         } finally {
             setIsTesting(false);
+        }
+    };
+ 
+    const handleTestOpenAI = async () => {
+        setIsTestingOpenAI(true);
+        setOpenaiTestResult(null);
+        try {
+            // We save the settings first so the test uses the fresh values
+            await window.electronAPI.updateSettings(settings);
+            const res = await window.electronAPI.testOpenAI();
+            if (res.success) {
+                setOpenaiTestResult({ success: true, message: `Connected! Response: ${res.message}` });
+            } else {
+                setOpenaiTestResult({ success: false, message: `Failed: ${res.error}` });
+            }
+        } catch (error) {
+            setOpenaiTestResult({ success: false, message: `Test error: ${error}` });
+        } finally {
+            setIsTestingOpenAI(false);
         }
     };
 
@@ -730,10 +753,10 @@ export function SettingsPanel({ onClose, onSettingsChanged }: SettingsPanelProps
 
                             {settings.llmProvider === 'openai' ? (
                                 <div className="space-y-4 pt-2 border-t border-zinc-800">
-                                    <h3 className="text-sm font-semibold text-white">OpenAI Settings</h3>
+                                    <h3 className="text-sm font-semibold text-white">OpenAI-Compatible Settings</h3>
                                     <div>
                                         <label className="block text-sm font-medium text-zinc-300 mb-1">
-                                            OpenAI API Key
+                                            API Key
                                         </label>
                                         <input
                                             type="password"
@@ -748,17 +771,49 @@ export function SettingsPanel({ onClose, onSettingsChanged }: SettingsPanelProps
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium text-zinc-300 mb-1">
-                                            OpenAI Model
+                                            Base URL
                                         </label>
-                                        <select
+                                        <input
+                                            type="text"
+                                            value={settings.openaiBaseUrl}
+                                            onChange={(e) => setSettings({ ...settings, openaiBaseUrl: e.target.value })}
+                                            placeholder="https://api.openai.com/v1"
+                                            className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                        />
+                                        <p className="mt-1 text-[10px] text-zinc-500">
+                                            Use this for OpenAI-compatible providers such as local gateways, proxies, or custom hosted APIs.
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-zinc-300 mb-1">
+                                            Model Name
+                                        </label>
+                                        <input
+                                            type="text"
                                             value={settings.openaiModel}
                                             onChange={(e) => setSettings({ ...settings, openaiModel: e.target.value })}
+                                            placeholder="gpt-4o-mini"
                                             className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                        />
+                                        <p className="mt-1 text-[10px] text-zinc-500">
+                                            Enter any model ID supported by the configured base URL.
+                                        </p>
+                                    </div>
+                                    <div className="flex flex-col gap-2 pt-2">
+                                        <button
+                                            onClick={handleTestOpenAI}
+                                            disabled={isTestingOpenAI}
+                                            className="w-full py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium rounded-lg transition-colors border border-zinc-700 flex items-center justify-center gap-2"
                                         >
-                                            <option value="gpt-4o-mini">gpt-4o-mini (Fast & Cheap - Recommended)</option>
-                                            <option value="gpt-4o">gpt-4o (High Accuracy)</option>
-                                            <option value="o3-mini">o3-mini (Reasoning Model)</option>
-                                        </select>
+                                            {isTestingOpenAI ? 'Testing...' : 'Test OpenAI Connection'}
+                                        </button>
+                                        {openaiTestResult && (
+                                            <div className={`text-[10px] px-2 py-1 rounded ${
+                                                openaiTestResult.success ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'
+                                            }`}>
+                                                {openaiTestResult.message}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             ) : (
@@ -1000,7 +1055,7 @@ export function SettingsPanel({ onClose, onSettingsChanged }: SettingsPanelProps
 
                             <p className="mt-4 text-xs text-zinc-500">
                                 {settings.llmProvider === 'openai' 
-                                    ? `Currently using Cloud OpenAI (${settings.openaiModel}).`
+                                    ? `Currently using OpenAI-compatible provider (${settings.openaiModel}).`
                                     : settings.useOllamaOnly 
                                         ? "Currently strictly using local Ollama. Cloud fallbacks are disabled." 
                                         : "Gemini is the cloud primary. Groq is the cloud fallback. Ollama is the local fallback."}

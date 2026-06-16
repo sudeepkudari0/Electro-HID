@@ -75,6 +75,15 @@
         ]
       },
       {
+        "from": "native/browser-use-apply",
+        "to": "browser-use-apply",
+        "filter": [
+          "**/*",
+          "!venv/**/*",
+          "!__pycache__/**/*"
+        ]
+      },
+      {
         "from": "build/icon.ico",
         "to": "icon.ico"
       },

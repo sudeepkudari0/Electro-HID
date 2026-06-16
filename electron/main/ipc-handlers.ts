@@ -282,8 +282,8 @@ export function registerIPCHandlers(): void {
     // Ollama: Test connection
     ipcMain.handle(IPC_CHANNELS.TEST_OLLAMA, async () => {
         try {
-            const { getLLMService } = await import('./llm/llm-service');
-            const llmService = getLLMService();
+            const { LLMService } = await import('./llm/llm-service');
+            const llmService = new LLMService({ llmProvider: 'ollama', useOllamaOnly: true });
             
             // Try a minimal generation to verify connectivity and model availability
             const result = await llmService.generate({
@@ -299,6 +299,30 @@ export function registerIPCHandlers(): void {
             return {
                 success: false,
                 error: error instanceof Error ? error.message : 'Ollama not reachable or model not found',
+            };
+        }
+    });
+
+    // OpenAI: Test connection
+    ipcMain.handle(IPC_CHANNELS.TEST_OPENAI, async () => {
+        try {
+            const { LLMService } = await import('./llm/llm-service');
+            const llmService = new LLMService({ llmProvider: 'openai' });
+            
+            // Try a minimal generation to verify connectivity and model availability
+            const result = await llmService.generate({
+                systemPrompt: 'You are a connectivity tester.',
+                prompt: 'Say "OpenAI is active" in exactly three words.',
+                maxTokens: 10,
+                stream: false,
+            });
+            
+            return { success: true, message: result.text.trim() };
+        } catch (error) {
+            console.error('IPC: OpenAI test failed:', error);
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'OpenAI not reachable or API key invalid',
             };
         }
     });
@@ -655,7 +679,7 @@ Be concise but thorough. Use bullet points and code blocks where appropriate.`;
     // ── Career Hub: Auto-Apply Runner ────────────────────────────────────
     ipcMain.handle(IPC_CHANNELS.CAREER_RUN_APPLY, async (event, options) => {
         try {
-            const { runApply } = await import('./apply/runner');
+            const { runApply } = await import('./apply/browser-use-runner');
             const data = await runApply(options, (statusUpdate) => {
                 event.sender.send('career:apply-status', statusUpdate);
             });
@@ -668,10 +692,33 @@ Be concise but thorough. Use bullet points and code blocks where appropriate.`;
 
     ipcMain.handle(IPC_CHANNELS.CAREER_STOP_APPLY, async () => {
         try {
-            const { stopApply } = await import('./apply/runner');
+            const { stopApply } = await import('./apply/browser-use-runner');
             return await stopApply();
         } catch (error) {
             console.error('IPC: Auto-Apply stop failed:', error);
+            return { success: false, error: String(error) };
+        }
+    });
+
+    ipcMain.handle(IPC_CHANNELS.CAREER_RUN_LOGIN, async (event, site: 'linkedin' | 'default') => {
+        try {
+            const { runLogin } = await import('./apply/browser-use-runner');
+            const data = await runLogin(site, (statusUpdate) => {
+                event.sender.send('career:apply-status', statusUpdate);
+            });
+            return { success: true, data };
+        } catch (error) {
+            console.error('IPC: Auto-Apply login failed:', error);
+            return { success: false, error: String(error) };
+        }
+    });
+
+    ipcMain.handle(IPC_CHANNELS.CAREER_STOP_LOGIN, async () => {
+        try {
+            const { stopLogin } = await import('./apply/browser-use-runner');
+            return await stopLogin();
+        } catch (error) {
+            console.error('IPC: Auto-Apply stop login failed:', error);
             return { success: false, error: String(error) };
         }
     });
