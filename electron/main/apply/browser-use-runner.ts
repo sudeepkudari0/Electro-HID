@@ -186,8 +186,36 @@ export function runApply(
         };
       });
 
-      // Build payload JSON
+      // Build LLM config based on applyLlmProvider
       const settings = getSettings();
+      const applyProvider = settings.applyLlmProvider || 'openai';
+      let llmConfig = {
+        model: settings.applyModel || settings.openaiModel || "gpt-4o",
+        apiKey: settings.openaiApiKey || "",
+        baseUrl: settings.openaiBaseUrl || ""
+      };
+
+      if (applyProvider === 'gemini') {
+        llmConfig = {
+          model: settings.applyModel || settings.geminiModel || "gemini-2.0-flash",
+          apiKey: settings.geminiApiKey || "",
+          baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai"
+        };
+      } else if (applyProvider === 'groq') {
+        llmConfig = {
+          model: settings.applyModel || settings.groqModel || "llama-3.3-70b-versatile",
+          apiKey: settings.groqApiKey || "",
+          baseUrl: "https://api.groq.com/openai/v1"
+        };
+      } else if (applyProvider === 'ollama') {
+        llmConfig = {
+          model: settings.applyModel || settings.ollamaModel || "qwen3-vl:2b",
+          apiKey: "ollama",
+          baseUrl: settings.ollamaBaseUrl
+        };
+      }
+
+      // Build payload JSON
       const payload = {
         jobs: processedJobs,
         resumePdfPath: globalResumePath,
@@ -199,11 +227,7 @@ export function runApply(
           default: defaultProfileDir
         },
         candidateProfile: options.profile || {},
-        llm: {
-          model: settings.openaiModel || "gpt-4o",
-          apiKey: settings.openaiApiKey || "",
-          baseUrl: settings.openaiBaseUrl || ""
-        }
+        llm: llmConfig
       };
 
       const payloadPath = path.join(app.getPath("userData"), "temp-apply-payload.json");

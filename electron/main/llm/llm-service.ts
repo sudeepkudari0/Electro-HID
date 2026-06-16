@@ -12,6 +12,8 @@ export interface LLMOptions {
     maxTokens?: number;
     stream?: boolean;
     imageData?: string; // Base64 encoded image for vision APIs
+    task?: 'interview' | 'tailor' | 'apply';
+    modelOverride?: string;
 }
 
 /**
@@ -150,9 +152,69 @@ export class LLMService {
     }
 
     /**
+     * Resolve provider and model for the given task
+     */
+    private resolveProviderAndModel(task?: 'interview' | 'tailor' | 'apply') {
+        const settings = getSettings();
+        let provider: 'ollama' | 'openai' | 'gemini' | 'groq';
+        let model: string;
+
+        const activeTask = task || 'interview';
+
+        if (activeTask === 'tailor') {
+            provider = settings.tailorLlmProvider || 'gemini';
+            model = settings.tailorModel;
+        } else if (activeTask === 'apply') {
+            provider = settings.applyLlmProvider || 'openai';
+            model = settings.applyModel;
+        } else {
+            provider = settings.interviewLlmProvider || (settings.llmProvider === 'openai' ? 'openai' : (settings.useOllamaOnly ? 'ollama' : 'gemini'));
+            model = settings.interviewModel;
+        }
+
+        // If no model is configured for some reason, use the default model for that provider
+        if (!model) {
+            model = provider === 'gemini' ? settings.geminiModel :
+                    provider === 'groq' ? settings.groqModel :
+                    provider === 'openai' ? settings.openaiModel : settings.ollamaModel;
+        }
+        if (!model) {
+            model = LLMService.DEFAULT_MODELS[provider as keyof typeof LLMService.DEFAULT_MODELS];
+        }
+
+        return { provider, model };
+    }
+
+    /**
      * Non-streaming fallback mechanism
      */
     private async generateTextWithFallback(options: LLMOptions): Promise<string> {
+        const { provider, model } = this.resolveProviderAndModel(options.task);
+        const taskOptions = { ...options, modelOverride: model };
+
+        console.log(`[LLMService] Routed task "${options.task || 'interview'}" to provider "${provider}" with model "${model}"`);
+
+        try {
+            if (provider === 'openai') {
+                return await this.generateOpenAI(taskOptions);
+            } else if (provider === 'ollama') {
+                return await this.generateOllama(taskOptions);
+            } else if (provider === 'gemini') {
+                if (this.geminiClient) {
+                    return await this.generateGemini(taskOptions);
+                }
+                throw new Error("Gemini API key is not configured.");
+            } else if (provider === 'groq') {
+                if (this.groqClient) {
+                    return await this.generateGroq(taskOptions);
+                }
+                throw new Error("Groq API key is not configured.");
+            }
+        } catch (error) {
+            console.error(`[LLMService] Requested provider ${provider} failed, falling back to cascade...`, error);
+        }
+
+        // Cascade Fallback if requested provider failed
         if (this.config.llmProvider === 'openai') {
             console.log(`[LLMService] Using OpenAI provider (${this.config.openaiModel})...`);
             return await this.generateOpenAI(options);
@@ -197,6 +259,36 @@ export class LLMService {
      * Streaming fallback mechanism
      */
     private async *streamGenerateWithFallback(options: LLMOptions): AsyncIterable<string> {
+        const { provider, model } = this.resolveProviderAndModel(options.task);
+        const taskOptions = { ...options, modelOverride: model };
+
+        console.log(`[LLMService] Streaming task "${options.task || 'interview'}" to provider "${provider}" with model "${model}"`);
+
+        try {
+            if (provider === 'openai') {
+                yield* this.streamOpenAI(taskOptions);
+                return;
+            } else if (provider === 'ollama') {
+                yield* this.streamOllama(taskOptions);
+                return;
+            } else if (provider === 'gemini') {
+                if (this.geminiClient) {
+                    yield* this.streamGemini(taskOptions);
+                    return;
+                }
+                throw new Error("Gemini API key is not configured.");
+            } else if (provider === 'groq') {
+                if (this.groqClient) {
+                    yield* this.streamGroq(taskOptions);
+                    return;
+                }
+                throw new Error("Groq API key is not configured.");
+            }
+        } catch (error) {
+            console.error(`[LLMService] Requested streaming provider ${provider} failed, falling back to cascade...`, error);
+        }
+
+        // Cascade Fallback if requested provider failed
         if (this.config.llmProvider === 'openai') {
             console.log(`[LLMService] Using OpenAI provider Stream (${this.config.openaiModel})...`);
             yield* this.streamOpenAI(options);
@@ -278,7 +370,7 @@ export class LLMService {
         }
 
         const response = await this.geminiClient.models.generateContent({
-            model: this.config.geminiModel,
+            model: options.modelOverride || this.config.geminiModel,
             contents: contentParts,
             config: {
                 systemInstruction: options.systemPrompt,
@@ -303,7 +395,7 @@ export class LLMService {
         }
 
         const stream = await this.geminiClient.models.generateContentStream({
-            model: this.config.geminiModel,
+            model: options.modelOverride || this.config.geminiModel,
             contents: contentParts,
             config: {
                 systemInstruction: options.systemPrompt,
@@ -344,7 +436,7 @@ export class LLMService {
         }
 
         const response = await this.groqClient.chat.completions.create({
-            model: this.config.groqModel,
+            model: options.modelOverride || this.config.groqModel,
             messages,
             temperature: options.temperature ?? 0.7,
             max_tokens: options.maxTokens,
@@ -376,7 +468,7 @@ export class LLMService {
         }
 
         const stream = await this.groqClient.chat.completions.create({
-            model: this.config.groqModel,
+            model: options.modelOverride || this.config.groqModel,
             messages,
             temperature: options.temperature ?? 0.7,
             max_tokens: options.maxTokens,
@@ -417,7 +509,7 @@ export class LLMService {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    model: this.config.ollamaModel,
+                    model: options.modelOverride || this.config.ollamaModel,
                     messages,
                     stream: false,
                     think: false, // This natively disables thinking for Qwen3-VL/DeepSeek-R1 in Ollama
@@ -468,7 +560,7 @@ export class LLMService {
             const baseUrl = this.config.ollamaBaseUrl.replace(/\/v1\/?$/, '');
 
             const payload = {
-                model: this.config.ollamaModel,
+                model: options.modelOverride || this.config.ollamaModel,
                 messages,
                 stream: true,
                 think: false, // This natively disables thinking for Qwen3-VL/DeepSeek-R1 in Ollama
@@ -640,7 +732,7 @@ export class LLMService {
         }
 
         const response = await this.openaiClient.chat.completions.create({
-            model: this.config.openaiModel || 'gpt-4o-mini',
+            model: options.modelOverride || this.config.openaiModel || 'gpt-4o-mini',
             messages,
             temperature: options.temperature ?? 0.7,
             max_tokens: options.maxTokens,
@@ -675,7 +767,7 @@ export class LLMService {
         }
 
         const stream = await this.openaiClient.chat.completions.create({
-            model: this.config.openaiModel || 'gpt-4o-mini',
+            model: options.modelOverride || this.config.openaiModel || 'gpt-4o-mini',
             messages,
             temperature: options.temperature ?? 0.7,
             max_tokens: options.maxTokens,

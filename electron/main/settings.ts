@@ -25,18 +25,21 @@ export interface AppSettings {
     isESLMode: boolean;
     sttMode: 'vad' | 'chunks';
     capsolverApiKey: string;
-    useGroqProxy: boolean;
-    groqProxyBigModel: string;
-    groqProxySmallModel: string;
     llmProvider: 'ollama' | 'openai';
     openaiApiKey: string;
     openaiBaseUrl: string;
     openaiModel: string;
     resumeContext: string;
     headlessApply: boolean;
+    interviewLlmProvider: 'ollama' | 'openai' | 'gemini' | 'groq';
+    interviewModel: string;
+    tailorLlmProvider: 'ollama' | 'openai' | 'gemini' | 'groq';
+    tailorModel: string;
+    applyLlmProvider: 'ollama' | 'openai' | 'gemini' | 'groq';
+    applyModel: string;
 }
 
-const CURRENT_VERSION = 16;
+const CURRENT_VERSION = 17;
 
 const DEFAULT_SETTINGS: AppSettings = {
     version: CURRENT_VERSION,
@@ -61,15 +64,18 @@ const DEFAULT_SETTINGS: AppSettings = {
     isESLMode: false,
     sttMode: 'vad',
     capsolverApiKey: '',
-    useGroqProxy: false,
-    groqProxyBigModel: 'llama-3.3-70b-versatile',
-    groqProxySmallModel: 'llama-3.1-8b-instant',
     llmProvider: 'ollama',
     openaiApiKey: '',
     openaiBaseUrl: 'https://api.openai.com/v1',
     openaiModel: 'gpt-4o-mini',
     resumeContext: '',
     headlessApply: false,
+    interviewLlmProvider: 'ollama',
+    interviewModel: 'qwen3-vl:2b',
+    tailorLlmProvider: 'gemini',
+    tailorModel: 'gemini-2.0-flash',
+    applyLlmProvider: 'openai',
+    applyModel: 'gpt-4o-mini',
 };
 
 // Migration map: version number -> transform function
@@ -205,6 +211,21 @@ const MIGRATIONS: Record<number, (settings: any) => any> = {
             ...settings,
             headlessApply: false,
             version: 16,
+        };
+    },
+    16: (settings: any) => {
+        // v16 -> v17: Add task-specific providers and models
+        const primary = settings.llmProvider === 'openai' ? 'openai' : (settings.useOllamaOnly ? 'ollama' : 'gemini');
+        const primaryModel = (primary === 'openai' ? settings.openaiModel : (primary === 'ollama' ? settings.ollamaModel : settings.geminiModel)) || '';
+        return {
+            ...settings,
+            interviewLlmProvider: primary,
+            interviewModel: primaryModel || 'qwen3-vl:2b',
+            tailorLlmProvider: settings.geminiApiKey ? 'gemini' : 'ollama',
+            tailorModel: settings.geminiModel || 'gemini-2.0-flash',
+            applyLlmProvider: settings.openaiApiKey ? 'openai' : 'ollama',
+            applyModel: settings.openaiModel || 'gpt-4o-mini',
+            version: 17,
         };
     },
 };

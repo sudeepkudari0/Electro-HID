@@ -13,6 +13,7 @@ export class ElectronLLMProvider implements LLMProvider {
       prompt: prompt,
       temperature: options.temperature ?? 0.2,
       stream: false,
+      task: 'tailor',
     });
 
     if (!result.success) {

@@ -873,7 +873,7 @@ export async function runApply(
   await new Promise((r) => setTimeout(r, 2500));
 
   // 1. Manage proxy sidecar setup and execution if enabled
-  if (settings.useGroqProxy || settings.useOllamaOnly) {
+  if (settings.useOllamaOnly) {
     const proxyDir = getProxyDir();
     const venvDir = getProxyVenvDir(proxyDir);
     const pythonExe = getProxyVenvPython(venvDir);
@@ -886,16 +886,11 @@ export async function runApply(
 
     // Write .env file dynamically
     const envPath = path.join(proxyDir, ".env");
-    const isOllamaMode = settings.useOllamaOnly && !settings.useGroqProxy;
-    const bigModel = isOllamaMode 
-      ? `ollama/${settings.ollamaModel || 'qwen2.5-coder:7b'}`
-      : (settings.groqProxyBigModel || 'moonshotai/kimi-k2-instruct-0905');
-    const smallModel = isOllamaMode
-      ? `ollama/${settings.ollamaModel || 'qwen2.5-coder:7b'}`
-      : (settings.groqProxySmallModel || 'llama-3.1-8b-instant');
+    const bigModel = `ollama/${settings.ollamaModel || 'qwen2.5-coder:7b'}`;
+    const smallModel = `ollama/${settings.ollamaModel || 'qwen2.5-coder:7b'}`;
 
     const envContent = [
-      `GROQ_API_KEY="${settings.groqApiKey || ''}"`,
+      `GROQ_API_KEY=""`,
       `BIG_MODEL="${bigModel}"`,
       `SMALL_MODEL="${smallModel}"`,
       `PORT="8082"`,
@@ -905,10 +900,10 @@ export async function runApply(
     fs.writeFileSync(envPath, envContent, "utf-8");
 
     // Spawn proxy server
-    console.log("[Auto-Apply] Spawning Groq proxy server...");
+    console.log("[Auto-Apply] Spawning Local Ollama proxy server...");
     onStatusUpdate({
       status: "running",
-      action: "Launching Groq proxy server...",
+      action: "Launching Local Ollama proxy server...",
     });
 
     const scriptPath = path.join(proxyDir, "server.py");
@@ -939,10 +934,10 @@ export async function runApply(
     // Wait for the proxy server port (8082) to become active
     const isOpen = await checkPortOpen(8082, "127.0.0.1", 10000); // Wait up to 10 seconds
     if (!isOpen) {
-      console.error("[Auto-Apply] Groq proxy server failed to start on port 8082");
-      throw new Error("Failed to start Groq proxy server on port 8082 within 10 seconds.");
+      console.error("[Auto-Apply] Local Ollama proxy server failed to start on port 8082");
+      throw new Error("Failed to start Local Ollama proxy server on port 8082 within 10 seconds.");
     }
-    console.log("[Auto-Apply] Groq proxy server is active on port 8082");
+    console.log("[Auto-Apply] Local Ollama proxy server is active on port 8082");
   }
 
   console.log("[Auto-Apply] Spawning Claude Code agent subprocess...");
@@ -954,7 +949,7 @@ export async function runApply(
   const capsolverApiKey =
     settings.capsolverApiKey || process.env.CAPSOLVER_API_KEY || "";
 
-  const useProxy = settings.useGroqProxy || settings.useOllamaOnly;
+  const useProxy = settings.useOllamaOnly;
   const launchCmd = "claude";
   const launchArgs = ["--model", "sonnet"];
 
@@ -973,7 +968,7 @@ export async function runApply(
 
   const modelDesc = settings.useOllamaOnly 
     ? `Local Ollama Proxy (${settings.ollamaModel || "qwen2.5-coder:7b"})`
-    : (settings.useGroqProxy ? `Groq Proxy (${settings.groqProxyBigModel})` : "sonnet");
+    : "sonnet";
 
   console.log(`[Auto-Apply] Spawning browser agent using ${launchCmd} with model ${modelDesc}`);
 
