@@ -176,6 +176,54 @@ export function SettingsPanel({ onClose, onSettingsChanged }: SettingsPanelProps
         }
     };
 
+    const handleInterviewProviderChange = (provider: 'ollama' | 'openai' | 'gemini' | 'groq') => {
+        let defaultModel = 'gpt-4o-mini';
+        if (provider === 'ollama') {
+            defaultModel = 'qwen3-vl:2b';
+        } else if (provider === 'gemini') {
+            defaultModel = geminiModels.length > 0 ? geminiModels[0] : 'gemini-2.0-flash';
+        } else if (provider === 'groq') {
+            defaultModel = groqModels.length > 0 ? groqModels[0] : 'llama-3.3-70b-versatile';
+        }
+        setSettings(prev => ({
+            ...prev,
+            interviewLlmProvider: provider,
+            interviewModel: defaultModel
+        }));
+    };
+
+    const handleTailorProviderChange = (provider: 'ollama' | 'openai' | 'gemini' | 'groq') => {
+        let defaultModel = 'gpt-4o-mini';
+        if (provider === 'ollama') {
+            defaultModel = 'qwen2.5-coder:7b';
+        } else if (provider === 'gemini') {
+            defaultModel = geminiModels.length > 0 ? geminiModels[0] : 'gemini-2.0-flash';
+        } else if (provider === 'groq') {
+            defaultModel = groqModels.length > 0 ? groqModels[0] : 'llama-3.3-70b-versatile';
+        }
+        setSettings(prev => ({
+            ...prev,
+            tailorLlmProvider: provider,
+            tailorModel: defaultModel
+        }));
+    };
+
+    const handleApplyProviderChange = (provider: 'ollama' | 'openai' | 'gemini' | 'groq') => {
+        let defaultModel = 'gpt-4o-mini';
+        if (provider === 'ollama') {
+            defaultModel = 'qwen3-vl:2b';
+        } else if (provider === 'gemini') {
+            defaultModel = geminiModels.length > 0 ? geminiModels[0] : 'gemini-2.0-flash';
+        } else if (provider === 'groq') {
+            defaultModel = groqModels.length > 0 ? groqModels[0] : 'llama-3.3-70b-versatile';
+        }
+        setSettings(prev => ({
+            ...prev,
+            applyLlmProvider: provider,
+            applyModel: defaultModel
+        }));
+    };
+
     const loadData = async () => {
         try {
             const modelsRes = await window.electronAPI.getAvailableModels();
@@ -699,7 +747,7 @@ export function SettingsPanel({ onClose, onSettingsChanged }: SettingsPanelProps
                                         <label className="block text-[10px] font-medium text-zinc-400 mb-1">Provider</label>
                                         <select
                                             value={settings.interviewLlmProvider}
-                                            onChange={(e) => setSettings({ ...settings, interviewLlmProvider: e.target.value as any })}
+                                            onChange={(e) => handleInterviewProviderChange(e.target.value as any)}
                                             className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                         >
                                             <option value="ollama">Local (Ollama)</option>
@@ -781,7 +829,7 @@ export function SettingsPanel({ onClose, onSettingsChanged }: SettingsPanelProps
                                         <label className="block text-[10px] font-medium text-zinc-400 mb-1">Provider</label>
                                         <select
                                             value={settings.tailorLlmProvider}
-                                            onChange={(e) => setSettings({ ...settings, tailorLlmProvider: e.target.value as any })}
+                                            onChange={(e) => handleTailorProviderChange(e.target.value as any)}
                                             className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                         >
                                             <option value="ollama">Local (Ollama)</option>
@@ -861,7 +909,7 @@ export function SettingsPanel({ onClose, onSettingsChanged }: SettingsPanelProps
                                         <label className="block text-[10px] font-medium text-zinc-400 mb-1">Provider</label>
                                         <select
                                             value={settings.applyLlmProvider}
-                                            onChange={(e) => setSettings({ ...settings, applyLlmProvider: e.target.value as any })}
+                                            onChange={(e) => handleApplyProviderChange(e.target.value as any)}
                                             className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                         >
                                             <option value="ollama">Local (Ollama)</option>
@@ -1041,6 +1089,16 @@ export function SettingsPanel({ onClose, onSettingsChanged }: SettingsPanelProps
                                         value={settings.openaiBaseUrl}
                                         onChange={(e) => setSettings({ ...settings, openaiBaseUrl: e.target.value })}
                                         placeholder="https://api.openai.com/v1"
+                                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-medium text-zinc-400 mb-1">OpenAI Model Name (Default / Fallback)</label>
+                                    <input
+                                        type="text"
+                                        value={settings.openaiModel}
+                                        onChange={(e) => setSettings({ ...settings, openaiModel: e.target.value })}
+                                        placeholder="gpt-4o-mini"
                                         className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                     />
                                 </div>
