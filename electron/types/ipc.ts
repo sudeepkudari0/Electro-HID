@@ -89,6 +89,7 @@ export const IPC_CHANNELS = {
     CAREER_STOP_APPLY: 'career:stop-apply',
     CAREER_RUN_LOGIN: 'career:run-login',
     CAREER_STOP_LOGIN: 'career:stop-login',
+    CAREER_CHECK_LOGIN: 'career:check-login',
     CAREER_BLOCKED_COMPANIES_SAVE: 'career:blocked-companies:save',
     CAREER_BLOCKED_COMPANIES_LOAD: 'career:blocked-companies:load',
     // Window management

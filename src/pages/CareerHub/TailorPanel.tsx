@@ -13,7 +13,7 @@ import {
   generateResumePDF,
   buildFilename,
 } from "../../career/core/pdfGenerator";
-import type { MasterResume, Job } from "../../career/core/types";
+import type { Job } from "../../career/core/types";
 import { DataTable } from "../../components/ui/DataTable";
 import { ColumnDef } from "@tanstack/react-table";
 import {
@@ -49,7 +49,6 @@ export function TailorPanel() {
     error,
     setMasterResume,
     setMasterResumeYaml,
-    setMasterResumeText,
     setIsGenerating,
     setGeneratingStatus,
     setError,
@@ -69,26 +68,6 @@ export function TailorPanel() {
       return () => clearTimeout(timer);
     }
   }, [bulkTailorJobIds, masterResume]);
-
-  // Load master resume from electron store on mount
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await (
-          window as any
-        ).electronAPI?.careerHub?.loadProfile?.();
-        if (res?.success && res?.profile?.masterResumeYaml) {
-          setMasterResumeYaml(res.profile.masterResumeYaml);
-          setMasterResumeText(res.profile.masterResumeText || "");
-          const { load } = await import("js-yaml");
-          const parsed = load(res.profile.masterResumeYaml) as MasterResume;
-          setMasterResume(parsed);
-        }
-      } catch {
-        // Profile not set up yet
-      }
-    })();
-  }, []);
 
   const handleYamlUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -162,6 +141,8 @@ export function TailorPanel() {
         if (jdExtracted && jdExtracted.length > 50) {
           jd = jdExtracted;
           updateJob(job.id, { description: jdExtracted });
+          const updatedJobs = useJobStore.getState().jobs;
+          await (window as any).electronAPI?.careerHub?.saveJobs?.(updatedJobs);
         }
       }
     }
@@ -191,6 +172,8 @@ export function TailorPanel() {
       tailoredResumeText: resume,
       coverLetterText: letter,
     });
+    const updatedJobs = useJobStore.getState().jobs;
+    await (window as any).electronAPI?.careerHub?.saveJobs?.(updatedJobs);
   };
 
   const handleTailorJob = async (job: Job) => {

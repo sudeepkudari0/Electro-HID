@@ -375,3 +375,66 @@ export function stopLogin(): Promise<any> {
     resolve({ success: true });
   });
 }
+
+export function checkLoginStatus(
+  site: "linkedin" | "default"
+): Promise<any> {
+  return new Promise((resolve, reject) => {
+    try {
+      const nativeDir = getApplyDir();
+      const venvDir = getVenvDir(nativeDir);
+      const venvBin = getVenvPython(venvDir);
+      
+      // If venv doesn't exist, we aren't configured yet
+      if (!fs.existsSync(venvBin)) {
+        return resolve({ success: true, loggedIn: false });
+      }
+
+      const scriptPath = path.join(nativeDir, "session_login.py");
+
+      const userProfileBaseDir = path.join(app.getPath("userData"), "careerHub", "browser-profiles");
+      const profileDir = path.join(userProfileBaseDir, site === "linkedin" ? "linkedin" : "apply-default");
+      
+      if (!fs.existsSync(profileDir)) {
+        return resolve({ success: true, loggedIn: false });
+      }
+
+      console.log(`[Apply Runner] Checking login status for ${site} in:`, profileDir);
+      const proc = spawn(venvBin, [scriptPath, "--site", site, "--user-data-dir", profileDir, "--check"], {
+        cwd: nativeDir,
+      });
+
+      let stdoutData = "";
+      proc.stdout!.on("data", (data: Buffer) => {
+        stdoutData += data.toString();
+      });
+
+      proc.on("close", (code) => {
+        try {
+          const lines = stdoutData.split("\n");
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            try {
+              const parsed = JSON.parse(line.trim());
+              if (parsed && typeof parsed.loggedIn !== "undefined") {
+                return resolve(parsed);
+              }
+            } catch (e) {
+              // Not a JSON line, ignore
+            }
+          }
+          resolve({ success: false, error: "No structured login status output" });
+        } catch (e) {
+          resolve({ success: false, error: String(e) });
+        }
+      });
+
+      proc.on("error", (err) => {
+        reject(err);
+      });
+
+    } catch (err) {
+      reject(err);
+    }
+  });
+}

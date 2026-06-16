@@ -61,12 +61,10 @@ async def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--site", choices=["linkedin", "default"], required=True)
     parser.add_argument("--user-data-dir", required=True)
+    parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
 
     async with async_playwright() as p:
-        print(json.dumps({"type": "status", "message": f"Launching browser for manual {args.site} login..."}))
-        sys.stdout.flush()
-
         chrome_args = [
             "--no-first-run",
             "--no-default-browser-check",
@@ -82,10 +80,66 @@ async def main():
         # Launch persistent context
         context = await p.chromium.launch_persistent_context(
             user_data_dir=args.user_data_dir,
-            headless=False,
+            headless=args.check,
             args=chrome_args,
             viewport={"width": 1280, "height": 800}
         )
+
+        if args.check:
+            if args.site == "linkedin":
+                cookies = await context.cookies()
+                li_at_cookie = [c for c in cookies if c.get("name") == "li_at" and "linkedin.com" in c.get("domain", "")]
+                if not li_at_cookie:
+                    print(json.dumps({"success": True, "loggedIn": False}))
+                    sys.stdout.flush()
+                    await context.close()
+                    return
+
+                try:
+                    page = context.pages[0] if context.pages else await context.new_page()
+                    await page.goto("https://www.linkedin.com/feed", timeout=15000)
+                    
+                    current_url = page.url
+                    if "login" in current_url or "signup" in current_url or "checkpoint" in current_url:
+                        print(json.dumps({"success": True, "loggedIn": False}))
+                        sys.stdout.flush()
+                        await context.close()
+                        return
+
+                    name = None
+                    try:
+                        await page.wait_for_selector(".feed-identity-module__name, .global-nav__me-photo, .feed-identity-module__actor-meta", timeout=5000)
+                        
+                        name_elem = await page.query_selector(".feed-identity-module__name")
+                        if name_elem:
+                            name = (await name_elem.inner_text()).strip()
+                        
+                        if not name:
+                            name_elem = await page.query_selector(".feed-identity-module__actor-meta a")
+                            if name_elem:
+                                name = (await name_elem.inner_text()).strip()
+                                
+                        if not name:
+                            photo_elem = await page.query_selector(".global-nav__me-photo")
+                            if photo_elem:
+                                alt = await photo_elem.get_attribute("alt")
+                                if alt and "Photo of" in alt:
+                                    name = alt.split("Photo of")[-1].strip()
+                    except Exception:
+                        pass
+
+                    print(json.dumps({"success": True, "loggedIn": True, "name": name}))
+                except Exception as e:
+                    print(json.dumps({"success": False, "error": str(e)}))
+                sys.stdout.flush()
+                await context.close()
+                return
+            else:
+                # For default site, just check if profile directory exists and has some files
+                print(json.dumps({"success": True, "loggedIn": True}))
+                sys.stdout.flush()
+                await context.close()
+                return
 
         page = context.pages[0] if context.pages else await context.new_page()
 

@@ -157,6 +157,9 @@ interface ElectronAPI {
       site: "linkedin" | "default",
     ) => Promise<{ success: boolean; data?: any; error?: string }>;
     stopLogin: () => Promise<{ success: boolean; error?: string }>;
+    checkLogin: (
+      site: "linkedin" | "default",
+    ) => Promise<{ success: boolean; loggedIn: boolean; name?: string; error?: string }>;
     onApplyStatus: (
       callback: (eventData: {
         status: string;

@@ -22,7 +22,8 @@ import {
   ExternalLink,
   Linkedin,
   CheckCircle2,
-  Loader2
+  Loader2,
+  Info
 } from "lucide-react";
 
 interface StatusLog {
@@ -81,6 +82,72 @@ export function ApplyPanel() {
     })();
   }, []);
 
+  const [linkedinLoginStatus, setLinkedinLoginStatus] = useState<{
+    checked: boolean;
+    loggedIn: boolean;
+    name?: string;
+    checking: boolean;
+  }>({
+    checked: false,
+    loggedIn: false,
+    checking: false,
+  });
+
+  const [defaultLoginStatus, setDefaultLoginStatus] = useState<{
+    checked: boolean;
+    loggedIn: boolean;
+    checking: boolean;
+  }>({
+    checked: false,
+    loggedIn: false,
+    checking: false,
+  });
+
+  const checkLogins = async () => {
+    if (!(window as any).electronAPI?.careerHub?.checkLogin) return;
+
+    // Check LinkedIn
+    setLinkedinLoginStatus(prev => ({ ...prev, checking: true }));
+    try {
+      const res = await (window as any).electronAPI.careerHub.checkLogin("linkedin");
+      if (res?.success) {
+        setLinkedinLoginStatus({
+          checked: true,
+          loggedIn: !!res.loggedIn,
+          name: res.name || undefined,
+          checking: false,
+        });
+      } else {
+        setLinkedinLoginStatus(prev => ({ ...prev, checked: true, checking: false }));
+      }
+    } catch (e) {
+      console.error("Failed checking LinkedIn login:", e);
+      setLinkedinLoginStatus(prev => ({ ...prev, checked: true, checking: false }));
+    }
+
+    // Check Default Apply Profile
+    setDefaultLoginStatus(prev => ({ ...prev, checking: true }));
+    try {
+      const res = await (window as any).electronAPI.careerHub.checkLogin("default");
+      if (res?.success) {
+        setDefaultLoginStatus({
+          checked: true,
+          loggedIn: !!res.loggedIn,
+          checking: false,
+        });
+      } else {
+        setDefaultLoginStatus(prev => ({ ...prev, checked: true, checking: false }));
+      }
+    } catch (e) {
+      console.error("Failed checking default profile:", e);
+      setDefaultLoginStatus(prev => ({ ...prev, checked: true, checking: false }));
+    }
+  };
+
+  useEffect(() => {
+    checkLogins();
+  }, []);
+
   // Set up status event listener for auto-apply streams
   useEffect(() => {
     if (!(window as any).electronAPI?.careerHub?.onApplyStatus) return;
@@ -109,9 +176,13 @@ export function ApplyPanel() {
               status: "applied",
               appliedAt: new Date().toISOString(),
             });
+            const updatedJobs = useJobStore.getState().jobs;
+            (window as any).electronAPI?.careerHub?.saveJobs?.(updatedJobs);
             appendLog(`[SUCCESS] Job ID ${jobId} applied successfully!`);
           } else if (status === "failed") {
             updateJob(jobId, { status: "saved" }); // revert status so user can retry
+            const updatedJobs = useJobStore.getState().jobs;
+            (window as any).electronAPI?.careerHub?.saveJobs?.(updatedJobs);
             appendLog(`[FAILED] Job ID ${jobId} failed: ${message}`);
           } else {
             appendLog(`[SYSTEM] Job ID ${jobId} finished with: ${status.toUpperCase()} - ${message}`);
@@ -265,7 +336,7 @@ export function ApplyPanel() {
       setCurrentStep("Executing queue runner...");
 
       // Fetch profile state to supply candidate details to the agent
-      const profileRes = await (window as any).electronAPI.profile.load();
+      const profileRes = await (window as any).electronAPI.careerHub.loadProfile();
       const candidateProfile = profileRes?.success ? profileRes.profile : {};
 
       const res = await (window as any).electronAPI.careerHub.runApply({
@@ -314,6 +385,7 @@ export function ApplyPanel() {
       appendLog(`[SYSTEM] Error during login: ${err.message}`);
     } finally {
       setAgentStatus("idle");
+      checkLogins();
     }
   };
 
@@ -349,41 +421,115 @@ export function ApplyPanel() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
           {/* LinkedIn Login Card */}
-          <div className="bg-slate-900/50 border border-white/5 rounded-xl p-4 flex items-center justify-between gap-4">
+          <div className={`border p-4 flex items-center justify-between gap-4 rounded-xl transition-all duration-300 ${
+            linkedinLoginStatus.checked && linkedinLoginStatus.loggedIn
+              ? "bg-emerald-950/10 border-emerald-500/25 shadow-[0_0_15px_rgba(16,185,129,0.03)]"
+              : "bg-slate-900/50 border-white/5"
+          }`}>
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-500/10 rounded-lg text-blue-400">
+              <div className={`p-2 rounded-lg transition-colors ${
+                linkedinLoginStatus.checked && linkedinLoginStatus.loggedIn
+                  ? "bg-emerald-500/10 text-emerald-400"
+                  : "bg-blue-500/10 text-blue-400"
+              }`}>
                 <Linkedin className="w-5 h-5" />
               </div>
               <div>
-                <p className="font-semibold text-sm text-slate-200">LinkedIn Session</p>
-                <p className="text-[11px] text-slate-400">Holds LinkedIn credentials & cookies</p>
+                <p className="font-semibold text-sm text-slate-200 flex items-center gap-1.5">
+                  LinkedIn Session
+                  {linkedinLoginStatus.checked && linkedinLoginStatus.loggedIn && (
+                    <span className="flex h-2 w-2 relative">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                  )}
+                </p>
+                {linkedinLoginStatus.checking ? (
+                  <p className="text-[11px] text-slate-400 flex items-center gap-1.5">
+                    <Loader2 className="w-3 h-3 animate-spin text-indigo-400" />
+                    Checking authentication...
+                  </p>
+                ) : linkedinLoginStatus.checked && linkedinLoginStatus.loggedIn ? (
+                  <p className="text-[11px] text-emerald-400 font-medium flex items-center gap-1">
+                    ✓ Logged in: <span className="text-slate-200 font-semibold">{linkedinLoginStatus.name || "Active Session"}</span>
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-slate-400">Holds LinkedIn credentials & cookies</p>
+                )}
               </div>
             </div>
             <button
               onClick={() => handleRunLogin("linkedin")}
-              disabled={agentStatus === "running"}
-              className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition"
+              disabled={agentStatus === "running" || linkedinLoginStatus.checking}
+              className={`px-3.5 py-1.5 disabled:opacity-50 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
+                linkedinLoginStatus.checked && linkedinLoginStatus.loggedIn
+                  ? "bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/10"
+                  : "bg-blue-600 hover:bg-blue-500 text-white"
+              }`}
             >
-              <ExternalLink className="w-3.5 h-3.5" />
-              Login
+              {linkedinLoginStatus.checking ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  Checking
+                </>
+              ) : linkedinLoginStatus.checked && linkedinLoginStatus.loggedIn ? (
+                <>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  Switch Account
+                </>
+              ) : (
+                <>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  Login
+                </>
+              )}
             </button>
           </div>
 
           {/* Default Browser Login Card */}
-          <div className="bg-slate-900/50 border border-white/5 rounded-xl p-4 flex items-center justify-between gap-4">
+          <div className={`border p-4 flex items-center justify-between gap-4 rounded-xl transition-all duration-300 ${
+            defaultLoginStatus.checked && defaultLoginStatus.loggedIn
+              ? "bg-slate-900/40 border-emerald-500/15"
+              : "bg-slate-900/50 border-white/5"
+          }`}>
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-emerald-500/10 rounded-lg text-emerald-400">
+              <div className={`p-2 rounded-lg transition-colors ${
+                defaultLoginStatus.checked && defaultLoginStatus.loggedIn
+                  ? "bg-emerald-500/10 text-emerald-400"
+                  : "bg-emerald-500/5 text-emerald-500/60"
+              }`}>
                 <Settings className="w-5 h-5" />
               </div>
-              <div>
-                <p className="font-semibold text-sm text-slate-200">Default Apply Profile</p>
-                <p className="text-[11px] text-slate-400">Holds forms, resumes & Greenhouse cache</p>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-sm text-slate-200 flex items-center gap-1.5">
+                  Default Apply Profile
+                  <span className="group relative cursor-pointer text-slate-400 hover:text-slate-200">
+                    <Info className="w-3.5 h-3.5" />
+                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-2.5 bg-slate-950 border border-white/10 text-[11px] text-slate-300 rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 shadow-2xl font-normal leading-normal">
+                      This browser session saves your forms, resumes, and cookies on portal sites like Lever, Greenhouse, or Workday. Click 'Open Browser' to log into those sites or test auto-fill.
+                    </span>
+                  </span>
+                </p>
+                {defaultLoginStatus.checking ? (
+                  <p className="text-[11px] text-slate-400 flex items-center gap-1.5">
+                    <Loader2 className="w-3 h-3 animate-spin text-indigo-400" />
+                    Checking profile status...
+                  </p>
+                ) : defaultLoginStatus.checked && defaultLoginStatus.loggedIn ? (
+                  <p className="text-[11px] text-slate-400 leading-tight">
+                    <span className="text-emerald-400 font-semibold">✓ Profile Ready</span> • Pre-fills job applications & caches forms
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-slate-400 leading-tight">
+                    Pre-fills job applications, stores resumes, and caches Greenhouse/Lever forms
+                  </p>
+                )}
               </div>
             </div>
             <button
               onClick={() => handleRunLogin("default")}
-              disabled={agentStatus === "running"}
-              className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 border border-white/10 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition"
+              disabled={agentStatus === "running" || defaultLoginStatus.checking}
+              className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 border border-white/10 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition whitespace-nowrap"
             >
               <ExternalLink className="w-3.5 h-3.5" />
               Open Browser

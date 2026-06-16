@@ -3,7 +3,7 @@
  * Houses all career management features: Job Search, Tracking, Resume Tailoring, Cover Letters.
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   useNavigationStore,
   type CareerTab,
@@ -18,6 +18,7 @@ import { JobBoard } from "./JobBoard";
 import { TailorPanel } from "./TailorPanel";
 import { JobSearch } from "./JobSearch";
 import { ApplyPanel } from "./ApplyPanel";
+import type { MasterResume } from "../../career/core/types";
 
 const TABS: { id: CareerTab; label: string; icon: string }[] = [
   { id: "jobs", label: "My Jobs", icon: "📋" },
@@ -30,6 +31,30 @@ const TABS: { id: CareerTab; label: string; icon: string }[] = [
 export function CareerHub() {
   const { careerTab, setCareerTab } = useNavigationStore();
   const [showConfirmReset, setShowConfirmReset] = useState(false);
+
+  const { setMasterResume, setMasterResumeYaml, setMasterResumeText } = useTailoringStore();
+  const { setProfile } = useCareerProfileStore();
+
+  // Load career profile / master resume from electron store on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await (
+          window as any
+        ).electronAPI?.careerHub?.loadProfile?.();
+        if (res?.success && res?.profile?.masterResumeYaml) {
+          setMasterResumeYaml(res.profile.masterResumeYaml);
+          setMasterResumeText(res.profile.masterResumeText || "");
+          const { load } = await import("js-yaml");
+          const parsed = load(res.profile.masterResumeYaml) as MasterResume;
+          setMasterResume(parsed);
+          setProfile(res.profile);
+        }
+      } catch (err) {
+        console.error("Failed to load career profile on mount:", err);
+      }
+    })();
+  }, [setMasterResume, setMasterResumeYaml, setMasterResumeText, setProfile]);
 
   const handleResetAll = async () => {
     try {

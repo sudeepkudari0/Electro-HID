@@ -214,6 +214,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         stopApply: async () => ipcRenderer.invoke('career:stop-apply'),
         runLogin: async (site: 'linkedin' | 'default') => ipcRenderer.invoke('career:run-login', site),
         stopLogin: async () => ipcRenderer.invoke('career:stop-login'),
+        checkLogin: async (site: 'linkedin' | 'default') => ipcRenderer.invoke('career:check-login', site),
         onApplyStatus: (callback: (eventData: any) => void) => {
             const handler = (_event: any, data: any) => callback(data);
             ipcRenderer.on('career:apply-status', handler);

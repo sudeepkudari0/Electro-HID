@@ -746,6 +746,16 @@ Be concise but thorough. Use bullet points and code blocks where appropriate.`;
         }
     });
 
+    ipcMain.handle(IPC_CHANNELS.CAREER_CHECK_LOGIN, async (event, site: 'linkedin' | 'default') => {
+        try {
+            const { checkLoginStatus } = await import('./apply/browser-use-runner');
+            return await checkLoginStatus(site);
+        } catch (error) {
+            console.error('IPC: Auto-Apply check login failed:', error);
+            return { success: false, error: String(error) };
+        }
+    });
+
 
     // ── Career Hub: Fetch URL ────────────────────────────────────────────
     ipcMain.handle('career:fetch-url', async (event, url: string) => {
