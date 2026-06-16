@@ -226,6 +226,7 @@ export function JobSearch() {
     pythonAvailable: false,
     venvReady: false
   });
+  const [blockedCompanies, setBlockedCompanies] = useState<string[]>([]);
 
   useEffect(() => {
     if ((window as any).electronAPI?.careerHub?.checkJobspy) {
@@ -242,6 +243,14 @@ export function JobSearch() {
       }).catch(() => {
         setPythonStatus(prev => ({ ...prev, checked: true }));
       });
+    }
+
+    if ((window as any).electronAPI?.careerHub?.loadBlockedCompanies) {
+      (window as any).electronAPI.careerHub.loadBlockedCompanies().then((res: any) => {
+        if (res.success && res.companies) {
+          setBlockedCompanies(res.companies);
+        }
+      }).catch(() => {});
     }
   }, []);
 
@@ -280,12 +289,17 @@ export function JobSearch() {
     try {
       // Use country display name as location for the scraper
       const countryLabel = COUNTRIES.find(c => c.value === country)?.label?.replace(/^[^\w]*/, '').trim() || country;
+      
+      // Calculate results parameter for the python-jobspy scraper
+      // We add the count of blocked companies so that we can filter them out and still have enough
+      const resultsToRequest = maxResults + blockedCompanies.length;
+
       const response = await (window as any).electronAPI.careerHub.runJobspy({
         query,
         location: countryLabel,
         sites: selectedBoards.join(','),
         remote: isRemote,
-        results: maxResults,
+        results: resultsToRequest,
         hours: hoursOld,
         jobType: jobType || undefined,
         easyApply: easyApply || undefined,
@@ -295,7 +309,16 @@ export function JobSearch() {
       });
 
       if (response.success) {
-        setResults(response.data || []);
+        const allFetchedJobs = response.data || [];
+        const nonBlockedJobs = allFetchedJobs.filter((job: any) => {
+          const compName = (job.company || '').trim().toLowerCase();
+          return !blockedCompanies.some(blocked => blocked.trim().toLowerCase() === compName);
+        });
+        
+        // Slice to exactly maxResults
+        const finalJobsList = nonBlockedJobs.slice(0, maxResults);
+        setResults(finalJobsList);
+        
         // update setup status so it doesn't show in UI anymore, and update venv status
         setPythonStatus(prev => ({ ...prev, venvReady: true }));
       } else {
@@ -336,6 +359,32 @@ export function JobSearch() {
   const isSaved = (job: any) => {
     const url = job.job_url || job.job_url_direct;
     return savedJobs.some((j) => j.url === url);
+  };
+
+  const handleBlockCompany = async (companyName: string) => {
+    if (!companyName) return;
+    const trimmedName = companyName.trim();
+    if (!trimmedName) return;
+    
+    // Check if already blocked (case-insensitive)
+    const alreadyBlocked = blockedCompanies.some(
+      blocked => blocked.toLowerCase() === trimmedName.toLowerCase()
+    );
+    
+    if (alreadyBlocked) return;
+    
+    const newBlockedList = [...blockedCompanies, trimmedName];
+    setBlockedCompanies(newBlockedList);
+    
+    // Save to disk
+    if ((window as any).electronAPI?.careerHub?.saveBlockedCompanies) {
+      await (window as any).electronAPI.careerHub.saveBlockedCompanies(newBlockedList);
+    }
+    
+    // Immediately filter out from current results in state
+    setResults(prevResults => 
+      prevResults.filter(job => (job.company || '').trim().toLowerCase() !== trimmedName.toLowerCase())
+    );
   };
 
   return (
@@ -704,6 +753,25 @@ export function JobSearch() {
                       }}
                     >
                       🎙️ Prep
+                    </button>
+
+                    <button
+                      className="js-btn-block"
+                      onClick={() => handleBlockCompany(job.company)}
+                      style={{
+                        background: 'rgba(239, 68, 68, 0.1)',
+                        border: '1px solid rgba(239, 68, 68, 0.25)',
+                        color: '#f87171',
+                        padding: '6px 12px',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        marginLeft: '6px'
+                      }}
+                      title="Block this company from future search results"
+                    >
+                      🚫 Block
                     </button>
                   </div>
                 </div>

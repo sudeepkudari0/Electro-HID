@@ -630,6 +630,29 @@ Be concise but thorough. Use bullet points and code blocks where appropriate.`;
         }
     });
 
+    // ── Career Hub: Blocked Companies Storage ────────────────────────────
+    ipcMain.handle(IPC_CHANNELS.CAREER_BLOCKED_COMPANIES_SAVE, async (event, companies: string[]) => {
+        try {
+            const { JSONStore } = await import('./storage/store');
+            const store = new JSONStore('career-hub');
+            store.write('blocked-companies.json', companies);
+            return { success: true };
+        } catch (error) {
+            return { success: false, error: String(error) };
+        }
+    });
+
+    ipcMain.handle(IPC_CHANNELS.CAREER_BLOCKED_COMPANIES_LOAD, async () => {
+        try {
+            const { JSONStore } = await import('./storage/store');
+            const store = new JSONStore('career-hub');
+            const companies = store.read<string[]>('blocked-companies.json') || [];
+            return { success: true, companies };
+        } catch (error) {
+            return { success: false, error: String(error), companies: [] };
+        }
+    });
+
     // ── Career Hub: Career Profile Storage ───────────────────────────────
     ipcMain.handle(IPC_CHANNELS.CAREER_PROFILE_SAVE, async (event, profile: any) => {
         try {

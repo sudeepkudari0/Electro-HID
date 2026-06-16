@@ -23,7 +23,7 @@ Synapse AI is a privacy-first, offline desktop application designed to help you 
 - 📝 **Resume-Aware Feedback** - Input your professional background summary to receive personalized answer suggestions tailored specifically to your unique experience.
 - ⭐ **STAR Method Suggestions** - Practice structuring your behavioral responses using the Situation, Task, Action, and Result (STAR) framework.
 - 📄 **Practice Session Scoring & PDF Export** - Review multi-dimensional scores for your answers and export complete practice session reports to PDF for offline review.
-- 💼 **Career Hub** - Search for active job listings across top platforms and prepare specifically for those roles by importing their job descriptions directly into practice sessions.
+- 💼 **Career Hub** - Search for active job listings across top platforms (compensating for blocked companies automatically), block companies to exclude them from future searches, and prepare specifically for those roles by importing their job descriptions directly into practice sessions.
 
 ---
 

@@ -142,7 +142,9 @@ interface ElectronAPI {
       options: any,
     ) => Promise<{ success: boolean; data?: any; error?: string }>;
     onSetupStatus: (callback: (status: string) => void) => () => void;
-    fetchUrl: (url: string) => Promise<{ success: boolean; html?: string; error?: string }>;
+    fetchUrl: (
+      url: string,
+    ) => Promise<{ success: boolean; html?: string; error?: string }>;
     runApply: (options: {
       job: any;
       resumePdfBase64: string;
@@ -151,15 +153,27 @@ interface ElectronAPI {
       dryRun?: boolean;
     }) => Promise<{ success: boolean; data?: any; error?: string }>;
     stopApply: () => Promise<{ success: boolean; error?: string }>;
-    runLogin: (site: 'linkedin' | 'default') => Promise<{ success: boolean; data?: any; error?: string }>;
+    runLogin: (
+      site: "linkedin" | "default",
+    ) => Promise<{ success: boolean; data?: any; error?: string }>;
     stopLogin: () => Promise<{ success: boolean; error?: string }>;
-    onApplyStatus: (callback: (eventData: {
-      status: string;
-      action?: string;
-      log?: string;
-      cost?: number;
-      screenshot?: string;
-    }) => void) => () => void;
+    onApplyStatus: (
+      callback: (eventData: {
+        status: string;
+        action?: string;
+        log?: string;
+        cost?: number;
+        screenshot?: string;
+      }) => void,
+    ) => () => void;
+    saveBlockedCompanies: (
+      companies: string[],
+    ) => Promise<{ success: boolean; error?: string }>;
+    loadBlockedCompanies: () => Promise<{
+      success: boolean;
+      companies?: string[];
+      error?: string;
+    }>;
   };
 
   onShortcut: (channel: string, callback: () => void) => () => void;
@@ -169,7 +183,9 @@ interface ElectronAPI {
     maximize: () => Promise<{ success: boolean; error?: string }>;
     close: () => Promise<{ success: boolean; error?: string }>;
     isMaximized: () => Promise<boolean>;
-    onStateChanged: (callback: (state: { isMaximized: boolean }) => void) => () => void;
+    onStateChanged: (
+      callback: (state: { isMaximized: boolean }) => void,
+    ) => () => void;
   };
 }
 

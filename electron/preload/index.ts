@@ -219,6 +219,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
             ipcRenderer.on('career:apply-status', handler);
             return () => ipcRenderer.removeListener('career:apply-status', handler);
         },
+        saveBlockedCompanies: async (companies: string[]) => ipcRenderer.invoke('career:blocked-companies:save', companies),
+        loadBlockedCompanies: async () => ipcRenderer.invoke('career:blocked-companies:load'),
     },
 
     // Shell API
