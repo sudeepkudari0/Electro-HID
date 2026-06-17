@@ -52,6 +52,7 @@ export function ApplyPanel() {
     "idle" | "running" | "applied" | "expired" | "captcha" | "login_issue" | "failed" | "stopped" | "done" | "awaiting_approval"
   >("idle");
   const [currentStep, setCurrentStep] = useState("");
+  const [activeSessionType, setActiveSessionType] = useState<"queue" | "login" | null>(null);
   const [logs, setLogs] = useState<StatusLog[]>([]);
   const [rawLogs, setRawLogs] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<"monitor" | "raw">("monitor");
@@ -297,6 +298,7 @@ export function ApplyPanel() {
 
     setActiveJobId("queue");
     setAgentStatus("running");
+    setActiveSessionType("queue");
     setCurrentStep("Compiling resume PDFs for the queue...");
     setLogs([]);
     setRawLogs([]);
@@ -361,6 +363,7 @@ export function ApplyPanel() {
       appendLog(`[SYSTEM] Error: ${err.message || "Failed starting queue runner"}`);
     } finally {
       setActiveJobId(null);
+      setActiveSessionType(null);
     }
   };
 
@@ -371,6 +374,7 @@ export function ApplyPanel() {
     appendLog(`[SYSTEM] A browser window will open. Complete login manually and then close or exit the session.`);
     setCurrentStep(`Authenticating ${site.toUpperCase()}...`);
     setAgentStatus("running");
+    setActiveSessionType("login");
     
     try {
       const res = await (window as any).electronAPI.careerHub.runLogin(site);
@@ -385,6 +389,7 @@ export function ApplyPanel() {
       appendLog(`[SYSTEM] Error during login: ${err.message}`);
     } finally {
       setAgentStatus("idle");
+      setActiveSessionType(null);
       checkLogins();
     }
   };
@@ -411,6 +416,54 @@ export function ApplyPanel() {
     } catch (e) {
       console.error(e);
       appendLog("[SYSTEM] Failed to stop process cleanly.");
+    }
+  };
+
+  const handleAutofill = async (job: any) => {
+    if (!masterResume) {
+      alert("Please upload your master resume in the Tailor CV tab first.");
+      return;
+    }
+    
+    appendLog(`[SYSTEM] Compiling tailored resume for ${job.company}...`);
+    try {
+      const blob = await generateResumePDFBlob(
+        job.tailoredResumeText || "",
+        masterResume
+      );
+      
+      const base64data = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(blob);
+        reader.onloadend = () => {
+          const base64 = (reader.result as string).split(",")[1];
+          resolve(base64);
+        };
+      });
+
+      // Fetch profile state
+      const profileRes = await (window as any).electronAPI.careerHub.loadProfile();
+      const candidateProfile = profileRes?.success ? profileRes.profile : {};
+
+      appendLog(`[SYSTEM] Triggering autofill on active browser tab...`);
+      const res = await (window as any).electronAPI.careerHub.autofillPage({
+        job: {
+          id: job.id,
+          title: job.title,
+          company: job.company,
+          coverLetterText: job.coverLetterText || ""
+        },
+        profile: candidateProfile,
+        resumePdfBase64: base64data
+      });
+
+      if (res?.success) {
+        appendLog(`[SYSTEM] Autofill request sent.`);
+      } else {
+        appendLog(`[FAILED] Autofill: ${res?.error || "Unknown error"}`);
+      }
+    } catch (e: any) {
+      appendLog(`[ERROR] Autofill failed: ${e.message}`);
     }
   };
 
@@ -721,6 +774,18 @@ export function ApplyPanel() {
                         <span className="capitalize px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-slate-300">
                           {job.status === "saved" ? "ready" : job.status}
                         </span>
+                        {activeSessionType === "login" && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleAutofill(job);
+                            }}
+                            className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-md text-[10px] font-bold flex items-center gap-1 transition shadow-lg shadow-indigo-600/15"
+                          >
+                            <Sparkles className="w-3 h-3" />
+                            Autofill Page
+                          </button>
+                        )}
                         {job.status === "applied" && (
                           <span className="text-emerald-400 flex items-center gap-1">
                             <CheckCircle2 className="w-3.5 h-3.5" />

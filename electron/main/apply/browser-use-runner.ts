@@ -389,6 +389,40 @@ export function stopLogin(): Promise<any> {
   });
 }
 
+export function autofillCurrentPage(options: any): Promise<any> {
+  return new Promise((resolve) => {
+    if (activeLoginProc && activeLoginProc.stdin) {
+      console.log("[Apply Runner] Preparing autofill resume...");
+      const resumePath = path.join(app.getPath("userData"), `temp-resume-autofill.pdf`);
+      if (options.resumePdfBase64) {
+        fs.writeFileSync(resumePath, Buffer.from(options.resumePdfBase64, 'base64'));
+      }
+
+      const settings = getSettings();
+      const applyProvider = settings.applyLlmProvider || 'openai';
+      const llmConfig = {
+        model: applyProvider === 'openai' ? (settings.openaiModel || 'gpt-4o') : (settings.geminiModel || 'gemini-1.5-pro'),
+        apiKey: applyProvider === 'openai' ? settings.openaiApiKey : settings.geminiApiKey,
+        baseUrl: applyProvider === 'openai' ? settings.openaiBaseUrl : undefined
+      };
+      
+      const payload = {
+        action: "autofill",
+        job: options.job,
+        profile: options.profile,
+        resume_path: resumePath,
+        llm: llmConfig
+      };
+      
+      console.log("[Apply Runner] Sending autofill command to active login process stdin...");
+      activeLoginProc.stdin.write(JSON.stringify(payload) + "\n");
+      resolve({ success: true });
+    } else {
+      resolve({ success: false, error: "No active browser session open. Click 'Open Browser' or 'Login' to start a session first." });
+    }
+  });
+}
+
 export function checkLoginStatus(
   site: "linkedin" | "default"
 ): Promise<any> {
