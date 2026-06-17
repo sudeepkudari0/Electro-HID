@@ -1148,7 +1148,10 @@ async def main():
             shadow.innerHTML = `
               <style>
                 :host {
-                  all: initial !important;
+                  position: fixed !important;
+                  bottom: 24px !important;
+                  right: 24px !important;
+                  z-index: 2147483647 !important;
                   display: block !important;
                   font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
                 }
