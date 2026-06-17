@@ -508,6 +508,24 @@ async def fill_custom_dropdown(page, trigger, synonyms, label=""):
     return False
 
 async def run_autofill_impl(page, job_ctx, profile):
+    if not job_ctx:
+        job_ctx = {}
+    if not profile:
+        profile = {}
+    try:
+        await _run_autofill_impl_inner(page, job_ctx, profile)
+    except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
+        print(json.dumps({"type": "log", "message": f"[Autofill Error] Critical failure in run_autofill_impl: {str(e)}\n{tb}"}))
+        sys.stdout.flush()
+        try:
+            await page.evaluate("([status, layer]) => window.updateAutofillStatus(status, layer)", [f"Error: {str(e)}", "Failed"])
+            await page.evaluate("([msg, type]) => window.addAutofillLog(msg, type)", [f"Critical error: {str(e)}", "error"])
+        except Exception:
+            pass
+
+async def _run_autofill_impl_inner(page, job_ctx, profile):
     url = page.url
     print(json.dumps({"type": "log", "message": f"[Autofill] Starting autofill for: {job_ctx.get('title')} at {job_ctx.get('company')}..."}))
     sys.stdout.flush()
@@ -1129,47 +1147,61 @@ async def main():
             const shadow = host.attachShadow({ mode: 'open' });
             shadow.innerHTML = `
               <style>
+                :host {
+                  all: initial !important;
+                  display: block !important;
+                  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+                }
+                .widget-container, .widget-container * {
+                  box-sizing: border-box !important;
+                  line-height: 1.4 !important;
+                }
                 button {
-                  padding: 10px 18px;
-                  border-radius: 9999px;
-                  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
-                  color: #ffffff;
-                  border: 1px solid rgba(255, 255, 255, 0.1);
-                  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-                  font-weight: 700;
-                  font-size: 13px;
-                  cursor: pointer;
-                  box-shadow: 0 10px 25px rgba(99, 102, 241, 0.35);
-                  display: flex;
-                  align-items: center;
-                  gap: 6px;
-                  transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
+                  padding: 10px 18px !important;
+                  border-radius: 9999px !important;
+                  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%) !important;
+                  color: #ffffff !important;
+                  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+                  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+                  font-weight: 700 !important;
+                  font-size: 13px !important;
+                  cursor: pointer !important;
+                  box-shadow: 0 10px 25px rgba(99, 102, 241, 0.35) !important;
+                  display: flex !important;
+                  align-items: center !important;
+                  gap: 6px !important;
+                  transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s !important;
+                  margin: 0 !important;
+                  position: static !important;
                 }
                 button:hover {
-                  transform: translateY(-2px);
-                  box-shadow: 0 12px 30px rgba(99, 102, 241, 0.45);
+                  transform: translateY(-2px) !important;
+                  box-shadow: 0 12px 30px rgba(99, 102, 241, 0.45) !important;
                 }
                 button:active {
-                  transform: translateY(0);
+                  transform: translateY(0) !important;
                 }
                 button.hidden {
                   display: none !important;
                 }
 
                 .details-card {
-                  width: 320px;
-                  background: rgba(15, 23, 42, 0.9);
-                  backdrop-filter: blur(12px);
-                  border: 1px solid rgba(255, 255, 255, 0.1);
-                  border-radius: 16px;
-                  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
-                  color: #f1f5f9;
-                  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-                  padding: 16px;
-                  display: flex;
-                  flex-direction: column;
-                  gap: 12px;
-                  animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+                  width: 320px !important;
+                  background: rgba(15, 23, 42, 0.95) !important;
+                  backdrop-filter: blur(12px) !important;
+                  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+                  border-radius: 16px !important;
+                  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4) !important;
+                  color: #f1f5f9 !important;
+                  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+                  padding: 16px !important;
+                  display: flex !important;
+                  flex-direction: column !important;
+                  gap: 12px !important;
+                  animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+                  position: relative !important;
+                  z-index: 2147483647 !important;
+                  margin: 0 !important;
                 }
                 .details-card.hidden {
                   display: none !important;
@@ -1177,107 +1209,162 @@ async def main():
 
                 @keyframes slideIn {
                   from {
-                    transform: translateY(20px);
-                    opacity: 0;
+                    transform: translateY(20px) !important;
+                    opacity: 0 !important;
                   }
                   to {
-                    transform: translateY(0);
-                    opacity: 1;
+                    transform: translateY(0) !important;
+                    opacity: 1 !important;
                   }
                 }
 
                 .card-header {
-                  display: flex;
-                  justify-content: space-between;
-                  align-items: center;
-                  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-                  padding-bottom: 8px;
+                  display: flex !important;
+                  justify-content: space-between !important;
+                  align-items: center !important;
+                  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+                  padding-bottom: 8px !important;
+                  width: 100% !important;
+                  height: auto !important;
+                  position: static !important;
+                  margin: 0 !important;
                 }
                 .logo {
-                  font-weight: 700;
-                  font-size: 14px;
-                  background: linear-gradient(135deg, #a5b4fc 0%, #818cf8 100%);
-                  -webkit-background-clip: text;
-                  -webkit-text-fill-color: transparent;
+                  font-weight: 700 !important;
+                  font-size: 14px !important;
+                  background: linear-gradient(135deg, #a5b4fc 0%, #818cf8 100%) !important;
+                  -webkit-background-clip: text !important;
+                  -webkit-text-fill-color: transparent !important;
+                  display: inline-block !important;
+                  position: static !important;
+                  margin: 0 !important;
+                  padding: 0 !important;
                 }
                 .close-btn {
-                  cursor: pointer;
-                  font-size: 18px;
-                  color: #94a3b8;
-                  transition: color 0.2s;
+                  cursor: pointer !important;
+                  font-size: 18px !important;
+                  color: #94a3b8 !important;
+                  transition: color 0.2s !important;
+                  display: inline-block !important;
+                  position: static !important;
+                  margin: 0 !important;
+                  padding: 0 !important;
                 }
                 .close-btn:hover {
-                  color: #f1f5f9;
+                  color: #f1f5f9 !important;
                 }
 
                 .card-body {
-                  display: flex;
-                  flex-direction: column;
-                  gap: 8px;
+                  display: flex !important;
+                  flex-direction: column !important;
+                  gap: 8px !important;
+                  width: 100% !important;
+                  height: auto !important;
+                  position: static !important;
+                  margin: 0 !important;
+                  padding: 0 !important;
                 }
                 .status-row {
-                  display: flex;
-                  justify-content: space-between;
-                  font-size: 13px;
+                  display: flex !important;
+                  flex-direction: row !important;
+                  justify-content: space-between !important;
+                  align-items: center !important;
+                  width: 100% !important;
+                  height: auto !important;
+                  font-size: 13px !important;
+                  position: static !important;
+                  margin: 0 !important;
+                  padding: 0 !important;
                 }
                 .status-row.hidden {
                   display: none !important;
                 }
                 .label {
-                  color: #94a3b8;
+                  color: #94a3b8 !important;
+                  font-size: 13px !important;
+                  font-weight: 500 !important;
+                  display: inline-block !important;
+                  position: static !important;
+                  margin: 0 !important;
+                  padding: 0 !important;
                 }
                 .status-value {
-                  font-weight: 600;
+                  font-weight: 600 !important;
+                  font-size: 13px !important;
+                  display: inline-block !important;
+                  position: static !important;
+                  margin: 0 !important;
+                  padding: 0 !important;
                 }
                 .status-value.highlight {
-                  color: #818cf8;
+                  color: #818cf8 !important;
                 }
 
                 .logs-container {
-                  max-height: 120px;
-                  overflow-y: auto;
-                  background: rgba(0, 0, 0, 0.2);
-                  border-radius: 8px;
-                  padding: 8px;
-                  font-size: 11px;
-                  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-                  display: flex;
-                  flex-direction: column;
-                  gap: 4px;
-                  border: 1px solid rgba(255, 255, 255, 0.05);
+                  max-height: 120px !important;
+                  height: 120px !important;
+                  overflow-y: auto !important;
+                  background: rgba(0, 0, 0, 0.3) !important;
+                  border-radius: 8px !important;
+                  padding: 8px !important;
+                  font-size: 11px !important;
+                  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+                  display: flex !important;
+                  flex-direction: column !important;
+                  gap: 4px !important;
+                  border: 1px solid rgba(255, 255, 255, 0.05) !important;
+                  width: 100% !important;
+                  position: static !important;
+                  margin: 4px 0 !important;
                 }
                 .log-item {
-                  color: #cbd5e1;
-                  line-height: 1.4;
-                  word-break: break-all;
+                  color: #cbd5e1 !important;
+                  line-height: 1.4 !important;
+                  word-break: break-all !important;
+                  display: block !important;
+                  position: static !important;
+                  margin: 0 !important;
+                  padding: 0 !important;
                 }
                 .log-item.success {
-                  color: #34d399;
+                  color: #34d399 !important;
                 }
                 .log-item.error {
-                  color: #f87171;
+                  color: #f87171 !important;
                 }
 
                 .llm-details {
-                  border-top: 1px solid rgba(255, 255, 255, 0.08);
-                  padding-top: 8px;
-                  display: flex;
-                  flex-direction: column;
-                  gap: 4px;
+                  border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+                  padding-top: 8px !important;
+                  display: flex !important;
+                  flex-direction: column !important;
+                  gap: 4px !important;
+                  width: 100% !important;
+                  height: auto !important;
+                  position: static !important;
+                  margin: 0 !important;
                 }
                 .llm-details.hidden {
                   display: none !important;
                 }
                 .llm-header {
-                  font-size: 12px;
-                  font-weight: 700;
-                  color: #818cf8;
+                  font-size: 12px !important;
+                  font-weight: 700 !important;
+                  color: #818cf8 !important;
+                  display: block !important;
+                  position: static !important;
+                  margin: 0 !important;
+                  padding: 0 !important;
                 }
                 .llm-fields {
-                  font-size: 11px;
-                  color: #94a3b8;
-                  white-space: pre-wrap;
-                  word-break: break-all;
+                  font-size: 11px !important;
+                  color: #94a3b8 !important;
+                  white-space: pre-wrap !important;
+                  word-break: break-all !important;
+                  display: block !important;
+                  position: static !important;
+                  margin: 0 !important;
+                  padding: 0 !important;
                 }
               </style>
               <div class="widget-container">
@@ -1401,25 +1488,39 @@ async def main():
 
         # Context-level exposed binding
         async def on_autofill_trigger(source):
-            page = source["page"]
-            ctx = job_context_by_page.get(page)
-            if not ctx:
-                # Fallback: check if the page's current URL matches any job URL
-                current_url = page.url
-                for p, c in job_context_by_page.items():
-                    if c.get("url") and c["url"] in current_url:
-                        ctx = c
-                        break
-            if not ctx:
-                # Fallback to first context if none matched
-                if job_context_by_page:
-                    ctx = list(job_context_by_page.values())[0]
-            
-            if ctx:
+            try:
+                page = source["page"]
+                print(json.dumps({"type": "log", "message": f"[Autofill] triggerAutofill called from page: {page.url}"}))
+                sys.stdout.flush()
+                
+                ctx = job_context_by_page.get(page)
+                if not ctx:
+                    # Fallback: check if the page's current URL matches any job URL
+                    current_url = page.url
+                    for p, c in job_context_by_page.items():
+                        if c.get("url") and c["url"] in current_url:
+                            ctx = c
+                            break
+                if not ctx:
+                    # Fallback to first context if none matched
+                    if job_context_by_page:
+                        ctx = list(job_context_by_page.values())[0]
+                
+                # If still no context (e.g. manual browser run), use empty fallback context
+                if not ctx:
+                    ctx = {
+                        "title": "",
+                        "company": "",
+                        "coverLetterText": "",
+                        "resumePath": ""
+                    }
+                
                 profile = payload_data.get("profile", {}) if payload_data else {}
                 await run_autofill_impl(page, ctx, profile)
-            else:
-                print(json.dumps({"type": "log", "message": "[Autofill] No job context matched for this tab."}))
+            except Exception as e:
+                import traceback
+                tb = traceback.format_exc()
+                print(json.dumps({"type": "log", "message": f"[Autofill Error in trigger] {str(e)}\n{tb}"}))
                 sys.stdout.flush()
 
         await context.expose_binding("triggerAutofill", lambda source: asyncio.create_task(on_autofill_trigger(source)))
@@ -1451,7 +1552,7 @@ async def main():
                     
                     job_context_by_page[page] = job
                     page.on("popup", lambda np, j=job: on_popup(np, j))
-                    page.on("close", on_page_close)
+                    page.on("close", lambda p=page: on_page_close(p))
                     
                     await page.goto(job["url"])
                     print(json.dumps({"type": "log", "message": f"Opened job page: {job.get('title')} at {job.get('company')}"}))

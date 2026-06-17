@@ -33,7 +33,7 @@ function loadWindow(win: BrowserWindow, hash?: string): void {
   const isDev = !isPackaged && process.env.NODE_ENV !== "production";
   if (isDev) {
     win.loadURL(getAppUrl(hash));
-    // win.webContents.openDevTools({ mode: 'detach' });
+    win.webContents.openDevTools({ mode: "detach" });
   } else {
     const indexPath = path.join(__dirname, "../../dist/index.html");
     win.loadFile(indexPath, hash ? { hash } : undefined);

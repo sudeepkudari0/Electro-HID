@@ -7,6 +7,39 @@ import { getSettings } from "../settings";
 let activeApplyProc: ChildProcess | null = null;
 let activeLoginProc: ChildProcess | null = null;
 
+function buildLlmConfig(): { model: string; apiKey: string; baseUrl?: string } {
+  const settings = getSettings();
+  const applyProvider = settings.applyLlmProvider || 'openai';
+  
+  let llmConfig = {
+    model: settings.applyModel || settings.openaiModel || "gpt-4o",
+    apiKey: settings.openaiApiKey || "",
+    baseUrl: settings.openaiBaseUrl || ""
+  };
+
+  if (applyProvider === 'gemini') {
+    llmConfig = {
+      model: settings.applyModel || settings.geminiModel || "gemini-2.0-flash",
+      apiKey: settings.geminiApiKey || "",
+      baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai"
+    };
+  } else if (applyProvider === 'groq') {
+    llmConfig = {
+      model: settings.applyModel || settings.groqModel || "llama-3.3-70b-versatile",
+      apiKey: settings.groqApiKey || "",
+      baseUrl: "https://api.groq.com/openai/v1"
+    };
+  } else if (applyProvider === 'ollama') {
+    llmConfig = {
+      model: settings.applyModel || settings.ollamaModel || "qwen3-vl:2b",
+      apiKey: "ollama",
+      baseUrl: settings.ollamaBaseUrl
+    };
+  }
+  return llmConfig;
+}
+
+
 export function getApplyDir(): string {
   if (app.isPackaged) {
     return path.join(process.resourcesPath, "browser-use-apply");
@@ -186,34 +219,8 @@ export function runApply(
         };
       });
 
-      // Build LLM config based on applyLlmProvider
       const settings = getSettings();
-      const applyProvider = settings.applyLlmProvider || 'openai';
-      let llmConfig = {
-        model: settings.applyModel || settings.openaiModel || "gpt-4o",
-        apiKey: settings.openaiApiKey || "",
-        baseUrl: settings.openaiBaseUrl || ""
-      };
-
-      if (applyProvider === 'gemini') {
-        llmConfig = {
-          model: settings.applyModel || settings.geminiModel || "gemini-2.0-flash",
-          apiKey: settings.geminiApiKey || "",
-          baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai"
-        };
-      } else if (applyProvider === 'groq') {
-        llmConfig = {
-          model: settings.applyModel || settings.groqModel || "llama-3.3-70b-versatile",
-          apiKey: settings.groqApiKey || "",
-          baseUrl: "https://api.groq.com/openai/v1"
-        };
-      } else if (applyProvider === 'ollama') {
-        llmConfig = {
-          model: settings.applyModel || settings.ollamaModel || "qwen3-vl:2b",
-          apiKey: "ollama",
-          baseUrl: settings.ollamaBaseUrl
-        };
-      }
+      const llmConfig = buildLlmConfig();
 
       const dbPath = path.join(app.getPath("userData"), "careerHub", "career_hub.db");
 
@@ -332,13 +339,7 @@ export function runLogin(
       // Load profile and LLM config for the manual session
       const { loadProfile } = require("../storage/profile-store");
       const profile = loadProfile();
-      const settings = getSettings();
-      const applyProvider = settings.applyLlmProvider || 'openai';
-      const llmConfig = {
-        model: applyProvider === 'openai' ? (settings.openaiModel || 'gpt-4o-mini') : (settings.geminiModel || 'gemini-2.0-flash'),
-        apiKey: applyProvider === 'openai' ? settings.openaiApiKey : settings.geminiApiKey,
-        baseUrl: applyProvider === 'openai' ? settings.openaiBaseUrl : undefined
-      };
+      const llmConfig = buildLlmConfig();
 
       // Write temp payload file
       const payloadPath = path.join(app.getPath("userData"), "temp-manual-autofill-payload.json");
@@ -360,6 +361,7 @@ export function runLogin(
 
       activeLoginProc.stdout!.on("data", (data: Buffer) => {
         const text = data.toString();
+        console.log(`[Python Login Stdout] ${text.trim()}`);
         const lines = text.split("\n");
         for (const line of lines) {
           if (!line.trim()) continue;
@@ -378,6 +380,7 @@ export function runLogin(
       activeLoginProc.stderr!.on("data", (data: Buffer) => {
         const text = data.toString().trim();
         if (text) {
+          console.error(`[Python Login Stderr] ${text}`);
           onStatusUpdate({
             type: "log",
             message: `[stderr] ${text}`
@@ -460,13 +463,7 @@ export function autofillCurrentPage(options: any): Promise<any> {
         fs.writeFileSync(resumePath, Buffer.from(options.resumePdfBase64, 'base64'));
       }
 
-      const settings = getSettings();
-      const applyProvider = settings.applyLlmProvider || 'openai';
-      const llmConfig = {
-        model: applyProvider === 'openai' ? (settings.openaiModel || 'gpt-4o-mini') : (settings.geminiModel || 'gemini-2.0-flash'),
-        apiKey: applyProvider === 'openai' ? settings.openaiApiKey : settings.geminiApiKey,
-        baseUrl: applyProvider === 'openai' ? settings.openaiBaseUrl : undefined
-      };
+      const llmConfig = buildLlmConfig();
       
       const payload = {
         action: "autofill",
@@ -526,13 +523,7 @@ export function runAutofillSession(
       const profileDir = path.join(userProfileBaseDir, profileDirName);
       fs.mkdirSync(profileDir, { recursive: true });
 
-      const settings = getSettings();
-      const applyProvider = settings.applyLlmProvider || 'openai';
-      const llmConfig = {
-        model: applyProvider === 'openai' ? (settings.openaiModel || 'gpt-4o-mini') : (settings.geminiModel || 'gemini-2.0-flash'),
-        apiKey: applyProvider === 'openai' ? settings.openaiApiKey : settings.geminiApiKey,
-        baseUrl: applyProvider === 'openai' ? settings.openaiBaseUrl : undefined
-      };
+      const llmConfig = buildLlmConfig();
 
       // Write temp payload file
       const payloadPath = path.join(app.getPath("userData"), "temp-autofill-payload.json");
@@ -554,6 +545,7 @@ export function runAutofillSession(
 
       activeLoginProc.stdout!.on("data", (data: Buffer) => {
         const text = data.toString();
+        console.log(`[Python Autofill Session Stdout] ${text.trim()}`);
         const lines = text.split("\n");
         for (const line of lines) {
           if (!line.trim()) continue;
@@ -572,6 +564,7 @@ export function runAutofillSession(
       activeLoginProc.stderr!.on("data", (data: Buffer) => {
         const text = data.toString().trim();
         if (text) {
+          console.error(`[Python Autofill Session Stderr] ${text}`);
           onStatusUpdate({
             type: "log",
             message: `[stderr] ${text}`
