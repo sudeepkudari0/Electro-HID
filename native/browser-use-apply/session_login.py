@@ -1386,6 +1386,10 @@ async def main():
                       <span class="label">Layer:</span>
                       <span id="layer-text" class="status-value highlight">None</span>
                     </div>
+                    <div id="resume-row" class="status-row hidden">
+                      <span class="label">Resume:</span>
+                      <span class="status-value"><a id="view-resume-btn" href="#" style="color:#818cf8; text-decoration:underline; font-weight:600; cursor:pointer;">View PDF ↗</a></span>
+                    </div>
                     <div id="logs-container" class="logs-container"></div>
                     <div id="llm-details" class="llm-details hidden">
                       <div class="llm-header">LLM Fields Invoked:</div>
@@ -1405,6 +1409,30 @@ async def main():
               e.stopPropagation();
               window.resetAutofillWidget();
             };
+            
+            const viewResumeBtn = shadow.getElementById('view-resume-btn');
+            if (viewResumeBtn) {
+              viewResumeBtn.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (window.viewResume) {
+                  window.viewResume();
+                }
+              };
+            }
+
+            if (window.checkResume) {
+              window.checkResume().then(hasResume => {
+                const resumeRow = shadow.getElementById('resume-row');
+                if (resumeRow) {
+                  if (hasResume) {
+                    resumeRow.classList.remove('hidden');
+                  } else {
+                    resumeRow.classList.add('hidden');
+                  }
+                }
+              }).catch(() => {});
+            }
             
             document.body.appendChild(host);
           }
@@ -1438,6 +1466,19 @@ async def main():
               llmDiv.classList.remove('hidden');
               shadow.getElementById('llm-fields').innerText = llmDetails;
             }
+
+            if (window.checkResume) {
+              window.checkResume().then(hasResume => {
+                const resumeRow = shadow.getElementById('resume-row');
+                if (resumeRow) {
+                  if (hasResume) {
+                    resumeRow.classList.remove('hidden');
+                  } else {
+                    resumeRow.classList.add('hidden');
+                  }
+                }
+              }).catch(() => {});
+            }
           };
 
           window.addAutofillLog = (message, type) => {
@@ -1468,6 +1509,7 @@ async def main():
             
             shadow.getElementById('status-text').innerText = 'Ready';
             shadow.getElementById('layer-row').classList.add('hidden');
+            shadow.getElementById('resume-row').classList.add('hidden');
             shadow.getElementById('logs-container').innerHTML = '';
             shadow.getElementById('llm-details').classList.add('hidden');
             shadow.getElementById('llm-fields').innerText = '';
@@ -1526,7 +1568,61 @@ async def main():
                 print(json.dumps({"type": "log", "message": f"[Autofill Error in trigger] {str(e)}\n{tb}"}))
                 sys.stdout.flush()
 
+        async def on_check_resume(source):
+            try:
+                page = source["page"]
+                ctx = job_context_by_page.get(page)
+                if not ctx:
+                    current_url = page.url
+                    for p, c in job_context_by_page.items():
+                        if c.get("url") and c["url"] in current_url:
+                            ctx = c
+                            break
+                if not ctx and job_context_by_page:
+                    ctx = list(job_context_by_page.values())[0]
+                
+                resume_path = ctx.get("resumePath") if ctx else None
+                if not resume_path and payload_data:
+                    resume_path = payload_data.get("resume_path") or payload_data.get("resumePdfPath")
+                
+                return bool(resume_path and os.path.exists(resume_path))
+            except Exception:
+                return False
+
+        async def on_view_resume(source):
+            try:
+                page = source["page"]
+                ctx = job_context_by_page.get(page)
+                if not ctx:
+                    current_url = page.url
+                    for p, c in job_context_by_page.items():
+                        if c.get("url") and c["url"] in current_url:
+                            ctx = c
+                            break
+                if not ctx and job_context_by_page:
+                    ctx = list(job_context_by_page.values())[0]
+                
+                resume_path = ctx.get("resumePath") if ctx else None
+                if not resume_path and payload_data:
+                    resume_path = payload_data.get("resume_path") or payload_data.get("resumePdfPath")
+                
+                if resume_path and os.path.exists(resume_path):
+                    import urllib.parse
+                    file_url = "file://" + urllib.parse.quote(os.path.abspath(resume_path))
+                    print(json.dumps({"type": "log", "message": f"[Autofill] Opening resume in new tab: {file_url}"}))
+                    sys.stdout.flush()
+                    new_page = await context.new_page()
+                    await new_page.goto(file_url)
+                else:
+                    print(json.dumps({"type": "log", "message": "[Autofill] No local resume path found to display."}))
+                    sys.stdout.flush()
+            except Exception as e:
+                print(json.dumps({"type": "log", "message": f"[Autofill Error viewing resume] {str(e)}"}))
+                sys.stdout.flush()
+
         await context.expose_binding("triggerAutofill", lambda source: asyncio.create_task(on_autofill_trigger(source)))
+        await context.expose_binding("checkResume", lambda source: asyncio.create_task(on_check_resume(source)))
+        await context.expose_binding("viewResume", lambda source: asyncio.create_task(on_view_resume(source)))
 
         # Popup and Tab lifecycle mapping handlers
         def on_popup(new_page, parent_ctx):
