@@ -214,6 +214,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         stopApply: async () => ipcRenderer.invoke('career:stop-apply'),
         approveApply: async () => ipcRenderer.invoke('career:approve-apply'),
         autofillPage: async (options: any) => ipcRenderer.invoke('career:autofill-page', options),
+        runAutofillSession: async (options: any) => ipcRenderer.invoke('career:run-autofill-session', options),
         runLogin: async (site: 'linkedin' | 'default') => ipcRenderer.invoke('career:run-login', site),
         stopLogin: async () => ipcRenderer.invoke('career:stop-login'),
         checkLogin: async (site: 'linkedin' | 'default') => ipcRenderer.invoke('career:check-login', site),

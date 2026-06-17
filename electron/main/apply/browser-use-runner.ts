@@ -423,6 +423,106 @@ export function autofillCurrentPage(options: any): Promise<any> {
   });
 }
 
+export function runAutofillSession(
+  options: { jobs: any[]; profile: any },
+  onStatusUpdate: (data: any) => void
+): Promise<any> {
+  return new Promise((resolve, reject) => {
+    try {
+      const venvBin = ensureVenvComplete(onStatusUpdate);
+      const nativeDir = getApplyDir();
+      const scriptPath = path.join(nativeDir, "session_login.py");
+
+      const userProfileBaseDir = path.join(app.getPath("userData"), "careerHub", "browser-profiles");
+      const profileDir = path.join(userProfileBaseDir, "apply-default");
+      fs.mkdirSync(profileDir, { recursive: true });
+
+      // Process jobs and write temporary resumes
+      const processedJobs = [];
+      for (const job of options.jobs) {
+        const resumePath = path.join(app.getPath("userData"), `temp-resume-${job.id}.pdf`);
+        if (job.resumePdfBase64) {
+          fs.writeFileSync(resumePath, Buffer.from(job.resumePdfBase64, 'base64'));
+        }
+        processedJobs.push({
+          id: job.id,
+          url: job.url,
+          title: job.title,
+          company: job.company,
+          coverLetterText: job.coverLetterText,
+          resumePath: resumePath
+        });
+      }
+
+      // Write temp payload file
+      const payloadPath = path.join(app.getPath("userData"), "temp-autofill-payload.json");
+      fs.writeFileSync(payloadPath, JSON.stringify({
+        jobs: processedJobs,
+        profile: options.profile
+      }, null, 2));
+
+      const settings = getSettings();
+      const applyProvider = settings.applyLlmProvider || 'openai';
+      const llmConfig = {
+        model: applyProvider === 'openai' ? (settings.openaiModel || 'gpt-4o') : (settings.geminiModel || 'gemini-1.5-pro'),
+        apiKey: applyProvider === 'openai' ? settings.openaiApiKey : settings.geminiApiKey,
+        baseUrl: applyProvider === 'openai' ? settings.openaiBaseUrl : undefined
+      };
+
+      console.log(`[Apply Runner] Launching autofill browser session for ${processedJobs.length} jobs.`);
+      activeLoginProc = spawn(venvBin, [
+        scriptPath,
+        "--site", "default",
+        "--user-data-dir", profileDir,
+        "--jobs-file", payloadPath
+      ], {
+        cwd: nativeDir,
+      });
+
+      activeLoginProc.stdout!.on("data", (data: Buffer) => {
+        const text = data.toString();
+        const lines = text.split("\n");
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const parsed = JSON.parse(line.trim());
+            onStatusUpdate(parsed);
+          } catch (e) {
+            onStatusUpdate({
+              type: "log",
+              message: line.trim()
+            });
+          }
+        }
+      });
+
+      activeLoginProc.stderr!.on("data", (data: Buffer) => {
+        const text = data.toString().trim();
+        if (text) {
+          onStatusUpdate({
+            type: "log",
+            message: `[stderr] ${text}`
+          });
+        }
+      });
+
+      activeLoginProc.on("close", (code) => {
+        activeLoginProc = null;
+        console.log(`[Apply Runner] Autofill browser process exited with code ${code}`);
+        resolve({ success: code === 0, code });
+      });
+
+      activeLoginProc.on("error", (err) => {
+        activeLoginProc = null;
+        reject(err);
+      });
+
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
 export function checkLoginStatus(
   site: "linkedin" | "default"
 ): Promise<any> {

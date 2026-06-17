@@ -11,6 +11,7 @@ import { ResumeEditor } from "../../career/core/resumeEditor";
 import { CoverLetterGenerator } from "../../career/core/coverLetter";
 import {
   generateResumePDF,
+  generateResumePDFBlob,
   buildFilename,
 } from "../../career/core/pdfGenerator";
 import type { Job } from "../../career/core/types";
@@ -28,6 +29,7 @@ import {
   Check,
   Loader2,
   Briefcase,
+  Globe,
 } from "lucide-react";
 
 export function TailorPanel() {
@@ -58,6 +60,19 @@ export function TailorPanel() {
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [copySuccessId, setCopySuccessId] = useState<string | null>(null);
   const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
+  const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
+
+  const selectedJobIds = useMemo(() => {
+    return Object.keys(rowSelection).filter((id) => rowSelection[id]);
+  }, [rowSelection]);
+
+  const selectedJobs = useMemo(() => {
+    return jobs.filter((j) => selectedJobIds.includes(j.id));
+  }, [jobs, selectedJobIds]);
+
+  useEffect(() => {
+    setRowSelection({});
+  }, [bulkTailorJobIds]);
 
   // Auto-trigger tailoring if bulk selected jobs are set and master resume is available
   useEffect(() => {
@@ -248,6 +263,76 @@ export function TailorPanel() {
       await generateResumePDF(resumeText, filename, masterResume);
     } catch (err: any) {
       setError("PDF generation failed: " + err.message);
+    }
+  };
+
+  const handleOpenSelectedInBrowser = async () => {
+    if (!masterResume) {
+      setError("Please upload your master resume first.");
+      return;
+    }
+
+    const jobsToOpen = selectedJobs.filter(j => j.url);
+    if (jobsToOpen.length === 0) {
+      alert("None of the selected jobs have a valid application URL.");
+      return;
+    }
+
+    setIsGenerating(true);
+    setGeneratingStatus("Compiling PDFs for browser session...");
+    setError(null);
+
+    try {
+      const jobsPayload = await Promise.all(
+        jobsToOpen.map(async (job) => {
+          let base64 = "";
+          const textToUse = job.tailoredResumeText || "";
+          if (textToUse) {
+            const blob = await generateResumePDFBlob(
+              textToUse,
+              masterResume
+            );
+            base64 = await new Promise<string>((resolve) => {
+              const reader = new FileReader();
+              reader.readAsDataURL(blob);
+              reader.onloadend = () => {
+                resolve((reader.result as string).split(",")[1]);
+              };
+            });
+          }
+          
+          return {
+            id: job.id,
+            title: job.title,
+            company: job.company,
+            url: job.url,
+            coverLetterText: job.coverLetterText || "",
+            resumePdfBase64: base64
+          };
+        })
+      );
+
+      const profileRes = await (window as any).electronAPI.careerHub.loadProfile();
+      const candidateProfile = profileRes?.success ? profileRes.profile : {};
+
+      setGeneratingStatus("Launching browser context...");
+      const res = await (window as any).electronAPI.careerHub.runAutofillSession({
+        jobs: jobsPayload,
+        profile: candidateProfile
+      });
+
+      if (res?.success) {
+        setError(null);
+      } else if (res?.error) {
+        setError(res.error);
+      }
+    } catch (err: any) {
+      console.error(err);
+      setError("Error launching browser: " + err.message);
+    } finally {
+      setIsGenerating(false);
+      setGeneratingStatus("");
+      setRowSelection({});
     }
   };
 
@@ -470,9 +555,20 @@ export function TailorPanel() {
         </div>
 
         <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+          {selectedJobIds.length > 0 && (
+            <button
+              onClick={handleOpenSelectedInBrowser}
+              disabled={isGenerating}
+              className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-semibold transition shadow-lg shadow-indigo-600/15 disabled:opacity-50"
+            >
+              <Globe className="w-4 h-4" />
+              <span>Open Selected ({selectedJobIds.length})</span>
+            </button>
+          )}
+
           <label
             className="js-btn-view"
-            style={{ cursor: "pointer", background: "rgba(255,255,255,0.05)" }}
+            style={{ cursor: "pointer", background: "rgba(255,255,255,0.05)", display: "flex", alignItems: "center", gap: "6px" }}
           >
             📄 {masterResume ? "Update Master Resume" : "Upload Master Resume"}
             <input
@@ -540,6 +636,9 @@ export function TailorPanel() {
             data={savedJobs}
             expandedRowId={expandedJobId}
             renderExpandedRow={renderExpandedRow}
+            enableSelection={true}
+            rowSelection={rowSelection}
+            onRowSelectionChange={setRowSelection}
           />
         )}
       </div>
