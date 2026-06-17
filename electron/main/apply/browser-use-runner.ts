@@ -329,8 +329,32 @@ export function runLogin(
       const profileDir = path.join(userProfileBaseDir, site === "linkedin" ? "linkedin" : "apply-default");
       fs.mkdirSync(profileDir, { recursive: true });
 
+      // Load profile and LLM config for the manual session
+      const { loadProfile } = require("../storage/profile-store");
+      const profile = loadProfile();
+      const settings = getSettings();
+      const applyProvider = settings.applyLlmProvider || 'openai';
+      const llmConfig = {
+        model: applyProvider === 'openai' ? (settings.openaiModel || 'gpt-4o-mini') : (settings.geminiModel || 'gemini-2.0-flash'),
+        apiKey: applyProvider === 'openai' ? settings.openaiApiKey : settings.geminiApiKey,
+        baseUrl: applyProvider === 'openai' ? settings.openaiBaseUrl : undefined
+      };
+
+      // Write temp payload file
+      const payloadPath = path.join(app.getPath("userData"), "temp-manual-autofill-payload.json");
+      fs.writeFileSync(payloadPath, JSON.stringify({
+        jobs: [],
+        profile: profile,
+        llm: llmConfig
+      }, null, 2));
+
       console.log(`[Apply Runner] Launching manual login for ${site} in:`, profileDir);
-      activeLoginProc = spawn(venvBin, [scriptPath, "--site", site, "--user-data-dir", profileDir], {
+      activeLoginProc = spawn(venvBin, [
+        scriptPath, 
+        "--site", site, 
+        "--user-data-dir", profileDir,
+        "--jobs-file", payloadPath
+      ], {
         cwd: nativeDir,
       });
 
@@ -363,12 +387,26 @@ export function runLogin(
 
       activeLoginProc.on("close", (code) => {
         activeLoginProc = null;
+        try {
+          if (fs.existsSync(payloadPath)) {
+            fs.unlinkSync(payloadPath);
+          }
+        } catch (e) {
+          // ignore
+        }
         console.log(`[Apply Runner] Login process exited with code ${code}`);
         resolve({ success: code === 0, code });
       });
 
       activeLoginProc.on("error", (err) => {
         activeLoginProc = null;
+        try {
+          if (fs.existsSync(payloadPath)) {
+            fs.unlinkSync(payloadPath);
+          }
+        } catch (e) {
+          // ignore
+        }
         reject(err);
       });
 
@@ -413,7 +451,11 @@ export function autofillCurrentPage(options: any): Promise<any> {
   return new Promise((resolve) => {
     if (activeLoginProc && activeLoginProc.stdin) {
       console.log("[Apply Runner] Preparing autofill resume...");
-      const resumePath = path.join(app.getPath("userData"), `temp-resume-autofill.pdf`);
+      const candidateName = options.profile?.fullName || "Candidate";
+      const cleanResumeName = `${candidateName.replace(/\s+/g, "")}_Resume.pdf`;
+      const singleTempDir = path.join(app.getPath("temp"), "career-hub", "single-autofill");
+      fs.mkdirSync(singleTempDir, { recursive: true });
+      const resumePath = path.join(singleTempDir, cleanResumeName);
       if (options.resumePdfBase64) {
         fs.writeFileSync(resumePath, Buffer.from(options.resumePdfBase64, 'base64'));
       }
@@ -421,7 +463,7 @@ export function autofillCurrentPage(options: any): Promise<any> {
       const settings = getSettings();
       const applyProvider = settings.applyLlmProvider || 'openai';
       const llmConfig = {
-        model: applyProvider === 'openai' ? (settings.openaiModel || 'gpt-4o') : (settings.geminiModel || 'gemini-1.5-pro'),
+        model: applyProvider === 'openai' ? (settings.openaiModel || 'gpt-4o-mini') : (settings.geminiModel || 'gemini-2.0-flash'),
         apiKey: applyProvider === 'openai' ? settings.openaiApiKey : settings.geminiApiKey,
         baseUrl: applyProvider === 'openai' ? settings.openaiBaseUrl : undefined
       };
@@ -456,9 +498,16 @@ export function runAutofillSession(
       const userProfileBaseDir = path.join(app.getPath("userData"), "careerHub", "browser-profiles");
       
       // Process jobs and write temporary resumes
-      const processedJobs = [];
+      const processedJobs: any[] = [];
+      const candidateName = options.profile?.fullName || "Candidate";
+      const cleanResumeName = `${candidateName.replace(/\s+/g, "")}_Resume.pdf`;
+
       for (const job of options.jobs) {
-        const resumePath = path.join(app.getPath("userData"), `temp-resume-${job.id}.pdf`);
+        // Create a separate temp directory for each job to avoid file locks and namespace collisions
+        const jobTempDir = path.join(app.getPath("temp"), "career-hub", job.id);
+        fs.mkdirSync(jobTempDir, { recursive: true });
+        
+        const resumePath = path.join(jobTempDir, cleanResumeName);
         if (job.resumePdfBase64) {
           fs.writeFileSync(resumePath, Buffer.from(job.resumePdfBase64, 'base64'));
         }
@@ -477,20 +526,21 @@ export function runAutofillSession(
       const profileDir = path.join(userProfileBaseDir, profileDirName);
       fs.mkdirSync(profileDir, { recursive: true });
 
+      const settings = getSettings();
+      const applyProvider = settings.applyLlmProvider || 'openai';
+      const llmConfig = {
+        model: applyProvider === 'openai' ? (settings.openaiModel || 'gpt-4o-mini') : (settings.geminiModel || 'gemini-2.0-flash'),
+        apiKey: applyProvider === 'openai' ? settings.openaiApiKey : settings.geminiApiKey,
+        baseUrl: applyProvider === 'openai' ? settings.openaiBaseUrl : undefined
+      };
+
       // Write temp payload file
       const payloadPath = path.join(app.getPath("userData"), "temp-autofill-payload.json");
       fs.writeFileSync(payloadPath, JSON.stringify({
         jobs: processedJobs,
-        profile: options.profile
+        profile: options.profile,
+        llm: llmConfig
       }, null, 2));
-
-      const settings = getSettings();
-      const applyProvider = settings.applyLlmProvider || 'openai';
-      const llmConfig = {
-        model: applyProvider === 'openai' ? (settings.openaiModel || 'gpt-4o') : (settings.geminiModel || 'gemini-1.5-pro'),
-        apiKey: applyProvider === 'openai' ? settings.openaiApiKey : settings.geminiApiKey,
-        baseUrl: applyProvider === 'openai' ? settings.openaiBaseUrl : undefined
-      };
 
       console.log(`[Apply Runner] Launching autofill browser session for ${processedJobs.length} jobs with profile: ${profileDirName}`);
       activeLoginProc = spawn(venvBin, [
@@ -531,6 +581,25 @@ export function runAutofillSession(
 
       activeLoginProc.on("close", (code) => {
         activeLoginProc = null;
+        try {
+          if (fs.existsSync(payloadPath)) {
+            fs.unlinkSync(payloadPath);
+          }
+          // Clean up job temp directories
+          for (const job of processedJobs) {
+            const jobTempDir = path.dirname(job.resumePath);
+            if (fs.existsSync(jobTempDir)) {
+              fs.rmSync(jobTempDir, { recursive: true, force: true });
+            }
+          }
+          // Clean up single autofill temp dir
+          const singleTempDir = path.join(app.getPath("temp"), "career-hub", "single-autofill");
+          if (fs.existsSync(singleTempDir)) {
+            fs.rmSync(singleTempDir, { recursive: true, force: true });
+          }
+        } catch (err) {
+          // ignore
+        }
         console.log(`[Apply Runner] Autofill browser process exited with code ${code}`);
         resolve({ success: code === 0, code });
       });
