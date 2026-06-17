@@ -416,48 +416,60 @@ async def main():
         # Context-level trigger injection script (Shadow DOM + Hotkey listener)
         trigger_script = """
         (() => {
-          if (document.getElementById('synapse-autofill-host')) return;
-          
-          const host = document.createElement('div');
-          host.id = 'synapse-autofill-host';
-          host.style.cssText = 'position:fixed;bottom:24px;right:24px;z-index:2147483647;display:block;';
-          
-          const shadow = host.attachShadow({ mode: 'open' });
-          shadow.innerHTML = `
-            <style>
-              button {
-                padding: 10px 18px;
-                border-radius: 9999px;
-                background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
-                color: #ffffff;
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-                font-weight: 700;
-                font-size: 13px;
-                cursor: pointer;
-                box-shadow: 0 10px 25px rgba(99, 102, 241, 0.35);
-                display: flex;
-                align-items: center;
-                gap: 6px;
-                transition: transform 0.2s, box-shadow 0.2s;
-              }
-              button:hover {
-                transform: translateY(-2px);
-                box-shadow: 0 12px 30px rgba(99, 102, 241, 0.45);
-              }
-              button:active {
-                transform: translateY(0);
-              }
-            </style>
-            <button id="btn">⚡ Autofill Form</button>
-          `;
-          
-          shadow.getElementById('btn').onclick = (e) => {
-            e.stopPropagation();
-            window.triggerAutofill();
-          };
-          
-          document.body.appendChild(host);
+          function inject() {
+            if (document.getElementById('synapse-autofill-host')) return;
+            if (!document.body) {
+              setTimeout(inject, 50);
+              return;
+            }
+            
+            const host = document.createElement('div');
+            host.id = 'synapse-autofill-host';
+            host.style.cssText = 'position:fixed;bottom:24px;right:24px;z-index:2147483647;display:block;';
+            
+            const shadow = host.attachShadow({ mode: 'open' });
+            shadow.innerHTML = `
+              <style>
+                button {
+                  padding: 10px 18px;
+                  border-radius: 9999px;
+                  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+                  color: #ffffff;
+                  border: 1px solid rgba(255, 255, 255, 0.1);
+                  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+                  font-weight: 700;
+                  font-size: 13px;
+                  cursor: pointer;
+                  box-shadow: 0 10px 25px rgba(99, 102, 241, 0.35);
+                  display: flex;
+                  align-items: center;
+                  gap: 6px;
+                  transition: transform 0.2s, box-shadow 0.2s;
+                }
+                button:hover {
+                  transform: translateY(-2px);
+                  box-shadow: 0 12px 30px rgba(99, 102, 241, 0.45);
+                }
+                button:active {
+                  transform: translateY(0);
+                }
+              </style>
+              <button id="btn">⚡ Autofill Form</button>
+            `;
+            
+            shadow.getElementById('btn').onclick = (e) => {
+              e.stopPropagation();
+              window.triggerAutofill();
+            };
+            
+            document.body.appendChild(host);
+          }
+
+          if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', inject);
+          } else {
+            inject();
+          }
 
           document.addEventListener('keydown', (e) => {
             if (e.ctrlKey && e.shiftKey && e.key.toUpperCase() === 'A') {
