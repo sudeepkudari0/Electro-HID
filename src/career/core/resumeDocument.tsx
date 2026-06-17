@@ -16,12 +16,14 @@ import {
 } from "@react-pdf/renderer";
 import type { MasterResume } from "./types";
 
+import { interRegularBase64, interBoldBase64 } from "./fonts";
+
 // ─── Font Registration ────────────────────────────────────────────────────────
 Font.register({
   family: "Inter",
   fonts: [
-    { src: "/fonts/Inter-Regular.ttf", fontWeight: 400 },
-    { src: "/fonts/Inter-Bold.ttf", fontWeight: 700 },
+    { src: interRegularBase64, fontWeight: 400 },
+    { src: interBoldBase64, fontWeight: 700 },
   ],
 });
 
