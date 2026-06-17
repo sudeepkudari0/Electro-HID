@@ -381,9 +381,29 @@ export function runLogin(
 export function stopLogin(): Promise<any> {
   return new Promise((resolve) => {
     if (activeLoginProc) {
-      console.log("[Apply Runner] Terminating login process...");
-      activeLoginProc.kill("SIGINT");
+      console.log("[Apply Runner] Gracefully stopping login process via stdin...");
+      if (activeLoginProc.stdin && activeLoginProc.stdin.writable) {
+        try {
+          activeLoginProc.stdin.write(JSON.stringify({ action: "close" }) + "\n");
+        } catch (e) {
+          console.error("[Apply Runner] Failed to write close command to stdin:", e);
+        }
+      }
+      
+      const proc = activeLoginProc;
       activeLoginProc = null;
+      
+      // Give it 1.5 seconds to exit gracefully, otherwise kill it
+      setTimeout(() => {
+        try {
+          if (proc && proc.exitCode === null) {
+            console.log("[Apply Runner] Graceful shutdown timed out. Force killing process...");
+            proc.kill("SIGKILL");
+          }
+        } catch (e) {
+          // ignore
+        }
+      }, 1500);
     }
     resolve({ success: true });
   });
@@ -434,9 +454,7 @@ export function runAutofillSession(
       const scriptPath = path.join(nativeDir, "session_login.py");
 
       const userProfileBaseDir = path.join(app.getPath("userData"), "careerHub", "browser-profiles");
-      const profileDir = path.join(userProfileBaseDir, "apply-default");
-      fs.mkdirSync(profileDir, { recursive: true });
-
+      
       // Process jobs and write temporary resumes
       const processedJobs = [];
       for (const job of options.jobs) {
@@ -454,6 +472,11 @@ export function runAutofillSession(
         });
       }
 
+      const hasLinkedInJob = processedJobs.some(j => j.url && j.url.includes("linkedin.com"));
+      const profileDirName = hasLinkedInJob ? "linkedin" : "apply-default";
+      const profileDir = path.join(userProfileBaseDir, profileDirName);
+      fs.mkdirSync(profileDir, { recursive: true });
+
       // Write temp payload file
       const payloadPath = path.join(app.getPath("userData"), "temp-autofill-payload.json");
       fs.writeFileSync(payloadPath, JSON.stringify({
@@ -469,10 +492,10 @@ export function runAutofillSession(
         baseUrl: applyProvider === 'openai' ? settings.openaiBaseUrl : undefined
       };
 
-      console.log(`[Apply Runner] Launching autofill browser session for ${processedJobs.length} jobs.`);
+      console.log(`[Apply Runner] Launching autofill browser session for ${processedJobs.length} jobs with profile: ${profileDirName}`);
       activeLoginProc = spawn(venvBin, [
         scriptPath,
-        "--site", "default",
+        "--site", hasLinkedInJob ? "linkedin" : "default",
         "--user-data-dir", profileDir,
         "--jobs-file", payloadPath
       ], {

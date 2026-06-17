@@ -74,6 +74,14 @@ async def listen_to_stdin(context):
             cmd = json.loads(line.decode().strip())
             if cmd.get("action") == "autofill":
                 await perform_autofill_stdin(context, cmd)
+            elif cmd.get("action") == "close":
+                # Close all pages to trigger the clean close loop
+                for page in list(context.pages):
+                    try:
+                        await page.close()
+                    except Exception:
+                        pass
+                break
         except asyncio.CancelledError:
             break
         except Exception as e:
