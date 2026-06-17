@@ -3,7 +3,7 @@
  */
 
 import { useState, useMemo, useEffect } from "react";
-import { useJobStore } from "../../career/state/career-store";
+import { useJobStore, useCareerProfileStore } from "../../career/state/career-store";
 import type { Job, JobStatus } from "../../career/core/types";
 import { useNavigationStore } from "@/state/navigation-store";
 import { DataTable } from "../../components/ui/DataTable";
@@ -48,6 +48,7 @@ export function JobManager() {
     getFilteredJobs,
     setBulkTailorJobIds,
   } = useJobStore();
+  const { profile } = useCareerProfileStore();
   const [showAddForm, setShowAddForm] = useState(false);
   const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
 
@@ -88,15 +89,23 @@ export function JobManager() {
   };
 
   const handleBulkOpenInBrowser = () => {
-    selectedJobs.forEach((job) => {
-      if (job.url) {
-        if ((window as any).electronAPI?.openExternal) {
-          (window as any).electronAPI.openExternal(job.url);
-        } else {
-          window.open(job.url, "_blank");
-        }
+    const jobsToOpen = selectedJobs.filter(j => j.url).map(job => ({
+      id: job.id,
+      url: job.url,
+      title: job.title,
+      company: job.company
+    }));
+
+    if (jobsToOpen.length > 0) {
+      if ((window as any).electronAPI?.careerHub?.runAutofillSession) {
+        (window as any).electronAPI.careerHub.runAutofillSession({
+          jobs: jobsToOpen,
+          profile: profile
+        }, (status: any) => console.log('Autofill status:', status));
+      } else {
+        jobsToOpen.forEach(j => window.open(j.url, "_blank"));
       }
-    });
+    }
   };
 
   const handleBulkTailor = () => {
@@ -299,7 +308,17 @@ export function JobManager() {
             {job.url && (
               <button
                 onClick={() => {
-                  if ((window as any).electronAPI?.openExternal) {
+                  if ((window as any).electronAPI?.careerHub?.runAutofillSession) {
+                    (window as any).electronAPI.careerHub.runAutofillSession({
+                      jobs: [{
+                        id: job.id,
+                        url: job.url,
+                        title: job.title,
+                        company: job.company
+                      }],
+                      profile: profile
+                    }, (status: any) => console.log('Autofill status:', status));
+                  } else if ((window as any).electronAPI?.openExternal) {
                     (window as any).electronAPI.openExternal(job.url);
                   } else {
                     window.open(job.url, "_blank");
