@@ -723,6 +723,16 @@ Be concise but thorough. Use bullet points and code blocks where appropriate.`;
         }
     });
 
+    ipcMain.handle(IPC_CHANNELS.CAREER_APPROVE_APPLY, async () => {
+        try {
+            const { approveApply } = await import('./apply/browser-use-runner');
+            return await approveApply();
+        } catch (error) {
+            console.error('IPC: Auto-Apply approve failed:', error);
+            return { success: false, error: String(error) };
+        }
+    });
+
     ipcMain.handle(IPC_CHANNELS.CAREER_RUN_LOGIN, async (event, site: 'linkedin' | 'default') => {
         try {
             const { runLogin } = await import('./apply/browser-use-runner');

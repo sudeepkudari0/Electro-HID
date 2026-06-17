@@ -212,6 +212,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         fetchUrl: async (url: string) => ipcRenderer.invoke('career:fetch-url', url),
         runApply: async (options: any) => ipcRenderer.invoke('career:run-apply', options),
         stopApply: async () => ipcRenderer.invoke('career:stop-apply'),
+        approveApply: async () => ipcRenderer.invoke('career:approve-apply'),
         runLogin: async (site: 'linkedin' | 'default') => ipcRenderer.invoke('career:run-login', site),
         stopLogin: async () => ipcRenderer.invoke('career:stop-login'),
         checkLogin: async (site: 'linkedin' | 'default') => ipcRenderer.invoke('career:check-login', site),

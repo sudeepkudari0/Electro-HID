@@ -215,6 +215,8 @@ export function runApply(
         };
       }
 
+      const dbPath = path.join(app.getPath("userData"), "careerHub", "career_hub.db");
+
       // Build payload JSON
       const payload = {
         jobs: processedJobs,
@@ -227,7 +229,8 @@ export function runApply(
           default: defaultProfileDir
         },
         candidateProfile: options.profile || {},
-        llm: llmConfig
+        llm: llmConfig,
+        dbPath: dbPath
       };
 
       const payloadPath = path.join(app.getPath("userData"), "temp-apply-payload.json");
@@ -297,6 +300,16 @@ export function stopApply(): Promise<any> {
       console.log("[Apply Runner] Terminating active apply process...");
       activeApplyProc.kill("SIGINT");
       activeApplyProc = null;
+    }
+    resolve({ success: true });
+  });
+}
+
+export function approveApply(): Promise<any> {
+  return new Promise((resolve) => {
+    if (activeApplyProc && activeApplyProc.stdin) {
+      console.log("[Apply Runner] Sending approval to active process stdin...");
+      activeApplyProc.stdin.write("approve\n");
     }
     resolve({ success: true });
   });

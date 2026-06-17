@@ -49,7 +49,7 @@ export function ApplyPanel() {
   const [selectedJobIds, setSelectedJobIds] = useState<string[]>([]);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [agentStatus, setAgentStatus] = useState<
-    "idle" | "running" | "applied" | "expired" | "captcha" | "login_issue" | "failed" | "stopped" | "done"
+    "idle" | "running" | "applied" | "expired" | "captcha" | "login_issue" | "failed" | "stopped" | "done" | "awaiting_approval"
   >("idle");
   const [currentStep, setCurrentStep] = useState("");
   const [logs, setLogs] = useState<StatusLog[]>([]);
@@ -389,6 +389,17 @@ export function ApplyPanel() {
     }
   };
 
+  const handleApproveSubmission = async () => {
+    appendLog("[SYSTEM] User clicked approve. Proceeding to submit...");
+    try {
+      await (window as any).electronAPI?.careerHub?.approveApply();
+      setAgentStatus("running");
+    } catch (e) {
+      console.error(e);
+      appendLog("[SYSTEM] Failed to send approval to agent.");
+    }
+  };
+
   const handleStopAgent = async () => {
     appendLog("[SYSTEM] Stopping active process...");
     try {
@@ -460,7 +471,7 @@ export function ApplyPanel() {
             </div>
             <button
               onClick={() => handleRunLogin("linkedin")}
-              disabled={agentStatus === "running" || linkedinLoginStatus.checking}
+              disabled={agentStatus === "running" || agentStatus === "awaiting_approval" || linkedinLoginStatus.checking}
               className={`px-3.5 py-1.5 disabled:opacity-50 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
                 linkedinLoginStatus.checked && linkedinLoginStatus.loggedIn
                   ? "bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/10"
@@ -528,7 +539,7 @@ export function ApplyPanel() {
             </div>
             <button
               onClick={() => handleRunLogin("default")}
-              disabled={agentStatus === "running" || defaultLoginStatus.checking}
+              disabled={agentStatus === "running" || agentStatus === "awaiting_approval" || defaultLoginStatus.checking}
               className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 border border-white/10 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition whitespace-nowrap"
             >
               <ExternalLink className="w-3.5 h-3.5" />
@@ -615,13 +626,22 @@ export function ApplyPanel() {
               <div className="flex gap-2">
                 <button
                   onClick={() => startQueue(dryRunGlobal)}
-                  disabled={agentStatus === "running" || selectedJobIds.length === 0}
+                  disabled={agentStatus === "running" || agentStatus === "awaiting_approval" || selectedJobIds.length === 0}
                   className="flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-500 transition disabled:opacity-50"
                 >
                   <Play className="w-4 h-4" />
                   Run Selected ({selectedJobIds.length})
                 </button>
-                {agentStatus === "running" && (
+                {agentStatus === "awaiting_approval" && (
+                  <button
+                    onClick={handleApproveSubmission}
+                    className="flex items-center justify-center gap-2 py-2 px-5 rounded-lg text-sm font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition shadow-[0_0_15px_rgba(16,185,129,0.2)] animate-pulse flex items-center gap-2"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    Approve Submission
+                  </button>
+                )}
+                {(agentStatus === "running" || agentStatus === "awaiting_approval") && (
                   <button
                     onClick={handleStopAgent}
                     className="flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-semibold bg-red-600/20 text-red-400 hover:bg-red-600/30 border border-red-500/30 transition"
@@ -725,11 +745,23 @@ export function ApplyPanel() {
             </h3>
 
             {/* Current Step Tracker */}
-            {agentStatus === "running" && (
-              <div className="bg-indigo-500/5 border border-indigo-500/20 rounded-xl p-4 flex gap-3 text-slate-200 animate-pulse">
-                <Loader2 className="w-5 h-5 animate-spin text-indigo-400 shrink-0 mt-0.5" />
+            {(agentStatus === "running" || agentStatus === "awaiting_approval") && (
+              <div className={`border rounded-xl p-4 flex gap-3 text-slate-200 ${
+                agentStatus === "awaiting_approval"
+                  ? "bg-emerald-500/5 border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.02)] animate-pulse"
+                  : "bg-indigo-500/5 border-indigo-500/20 animate-pulse"
+              }`}>
+                {agentStatus === "awaiting_approval" ? (
+                  <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                ) : (
+                  <Loader2 className="w-5 h-5 animate-spin text-indigo-400 shrink-0 mt-0.5" />
+                )}
                 <div className="space-y-1">
-                  <p className="text-xs font-semibold text-indigo-300">Current Action</p>
+                  <p className={`text-xs font-semibold ${
+                    agentStatus === "awaiting_approval" ? "text-emerald-300" : "text-indigo-300"
+                  }`}>
+                    {agentStatus === "awaiting_approval" ? "Action Required" : "Current Action"}
+                  </p>
                   <p className="text-sm font-medium text-slate-100">{currentStep || "Initializing..."}</p>
                 </div>
               </div>
