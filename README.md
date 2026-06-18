@@ -20,6 +20,7 @@ Synapse AI is a privacy-first, offline desktop application designed to help you 
 - 🎤 **Real-Time Speech Recognition** - Lightning-fast streaming transcription via Deepgram WebSocket API, with offline fallbacks using Whisper.cpp or Moonshine ONNX.
 - 🧠 **AI-Powered Answer Generation** - Get structured answer suggestions and follow-up questions using ultra-fast cloud providers (Groq, Gemini, OpenAI) or local LLMs (Ollama).
 - 👻 **Stealth Teleprompter Mode** - Floating, completely transparent, and click-through overlay mode for covert interview assistance that works on top of any video conferencing app.
+- 🎛️ **Adjustable UI Opacity** - Precisely control the visibility of the overlay using an intuitive slider or keyboard shortcuts (Ctrl+Shift+↑/↓), ensuring it blends perfectly with your active windows.
 - 🎙️ **Interview Prep Dashboard** - A beautiful, aesthetic landing page that automatically tracks your historical practice sessions, including questions asked, session duration, and performance.
 - 🔄 **Smart Audio & Echo Suppression** - Advanced dual-channel audio capture (microphone + system audio) with cross-channel echo suppression for seamless back-and-forth mock interviews.
 - 📊 **Real-Time Delivery Analytics** - Keep track of pacing (words per minute), filler words (like "um", "ah", "like"), and talk-time ratios to improve your delivery flow.

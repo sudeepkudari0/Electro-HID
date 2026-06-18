@@ -798,6 +798,18 @@ function App(): JSX.Element {
           toggleTeleprompterMode();
         }),
       );
+      unsubscribers.push(
+        window.electronAPI.onShortcut("shortcut:opacity-up", () => {
+          const state = useUIStore.getState();
+          state.setWidgetOpacity(Math.min(100, state.widgetOpacity + 5));
+        }),
+      );
+      unsubscribers.push(
+        window.electronAPI.onShortcut("shortcut:opacity-down", () => {
+          const state = useUIStore.getState();
+          state.setWidgetOpacity(Math.max(5, state.widgetOpacity - 5));
+        }),
+      );
     }
 
     return () => {

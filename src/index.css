@@ -36,8 +36,8 @@
 
   /* Shadows */
   --shadow-widget: 0 8px 32px rgba(0, 0, 0, 0.35),
-                   0 2px 8px rgba(0, 0, 0, 0.2),
-                   0 0 0 0.5px rgba(255, 255, 255, 0.06);
+    0 2px 8px rgba(0, 0, 0, 0.2),
+    0 0 0 0.5px rgba(255, 255, 255, 0.06);
 
   /* Timing */
   --ease-out: cubic-bezier(0.4, 0, 0.2, 1);
@@ -48,7 +48,7 @@
 
   /* Layout */
   --widget-width: 860px;
-  --widget-collapsed-width: 420px;
+  --widget-collapsed-width: 550px;
   --widget-expanded-width: 860px;
   --header-height: 48px;
   --widget-radius: 16px;

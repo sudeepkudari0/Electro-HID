@@ -12,6 +12,7 @@ import { MetricsBar } from '../DeliveryMetrics/MetricsBar';
 import { Shield } from 'lucide-react';
 import type { ChatBlock, DetectedQuestion, CandidateQuestion } from '../../state';
 import { useResize } from '../../hooks/useResize';
+import { useUIStore } from '../../state/ui-store';
 import './FloatingWidget.css';
 
 interface FloatingWidgetProps {
@@ -97,6 +98,7 @@ export function FloatingWidget({
     const widgetRef = useRef<HTMLDivElement>(null);
     const prevCandidateCount = useRef(candidateQuestions.length);
     const [selectedSession, setSelectedSession] = useState<any>(null);
+    const widgetOpacity = useUIStore((state) => state.widgetOpacity);
 
     // ─── Widget CSS position (for drag) ───
     const [widgetPos, setWidgetPos] = useState({ top: 16, right: 16 });
@@ -195,6 +197,7 @@ export function FloatingWidget({
                 style={{ 
                     top: isTeleprompterMode ? 0 : `${widgetPos.top}px`, 
                     right: isTeleprompterMode ? 0 : `${widgetPos.right}px`,
+                    opacity: isTeleprompterMode ? undefined : widgetOpacity / 100,
                     ...(isExpanded && !isTeleprompterMode ? {
                         width: `${widgetSize.width}px`,
                         height: widgetSize.height !== -1 ? `${widgetSize.height}px` : undefined,

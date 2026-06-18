@@ -1,18 +1,13 @@
-import { ReactNode } from 'react';
+import { ReactNode, forwardRef, ButtonHTMLAttributes } from 'react';
 
-interface IconButtonProps {
-    onClick: () => void;
+interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
     title: string;
     children: ReactNode;
     variant?: 'ghost' | 'subtle' | 'accent';
     size?: 'sm' | 'md';
-    disabled?: boolean;
-    className?: string;
-    id?: string;
 }
 
-export function IconButton({
-    onClick,
+export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(({
     title,
     children,
     variant = 'ghost',
@@ -20,7 +15,8 @@ export function IconButton({
     disabled = false,
     className = '',
     id,
-}: IconButtonProps) {
+    ...props
+}, ref) => {
     const baseClasses = 'inline-flex items-center justify-center rounded-lg transition-all duration-150 select-none';
 
     const sizeClasses = {
@@ -36,14 +32,16 @@ export function IconButton({
 
     return (
         <button
+            ref={ref}
             id={id}
-            onClick={onClick}
             title={title}
             disabled={disabled}
             data-no-drag
             className={`${baseClasses} ${sizeClasses[size]} ${variantClasses[variant]} ${disabled ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer'} ${className}`}
+            {...props}
         >
             {children}
         </button>
     );
-}
+});
+IconButton.displayName = 'IconButton';

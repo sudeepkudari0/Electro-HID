@@ -12,8 +12,10 @@ const SHORTCUTS = [
         { keys: ['Ctrl', 'Shift', 'A'], action: 'Region Capture' },
         { keys: ['Ctrl', 'Shift', 'G'], action: 'Generate Answer' },
     ]},
-    { category: 'Navigation', items: [
+    { category: 'Navigation & View', items: [
         { keys: ['Ctrl', 'Shift', 'H'], action: 'Toggle Widget' },
+        { keys: ['Ctrl', 'Shift', '↑'], action: 'Increase Opacity' },
+        { keys: ['Ctrl', 'Shift', '↓'], action: 'Decrease Opacity' },
         { keys: ['Esc'], action: 'Close Current Panel' },
     ]},
     { category: 'Region Selector', items: [

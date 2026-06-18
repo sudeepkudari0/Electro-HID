@@ -1,8 +1,12 @@
-import { Mic, MicOff, Camera, Crop, Sparkles, ChevronDown, ChevronUp, X, Loader2, MessageCircle, History, GraduationCap, Code2, Home } from 'lucide-react';
+import { Mic, MicOff, Camera, Crop, Sparkles, ChevronDown, ChevronUp, X, Loader2, MessageCircle, History, GraduationCap, Code2, Home, Blend, Keyboard } from 'lucide-react';
 import { IconButton } from '../shared/IconButton';
 import { PulsingDot } from '../shared/PulsingDot';
 import { useDrag } from '../../hooks/useDrag';
 import { useUIStore } from '../../state/ui-store';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/Popover';
+import { Slider } from '../ui/Slider';
+import { ShortcutsReference } from './ShortcutsReference';
+import { useState } from 'react';
 
 interface WidgetHeaderProps {
     isRecording: boolean;
@@ -44,7 +48,8 @@ export function WidgetHeader({
     onClose,
 }: WidgetHeaderProps) {
     const { onMouseDown } = useDrag(onDrag);
-    const { isCodeMode, toggleCodeMode } = useUIStore();
+    const { isCodeMode, toggleCodeMode, widgetOpacity, setWidgetOpacity } = useUIStore();
+    const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
 
     const formatTime = (seconds: number): string => {
         const mins = Math.floor(seconds / 60);
@@ -144,6 +149,65 @@ export function WidgetHeader({
                 >
                     <GraduationCap className="w-4 h-4" />
                 </IconButton>
+
+                {/* Opacity Controller */}
+                <Popover>
+                    <PopoverTrigger asChild>
+                        <IconButton
+                            id="btn-opacity-control"
+                            title="Adjust Opacity"
+                        >
+                            <Blend className="w-4 h-4" />
+                        </IconButton>
+                    </PopoverTrigger>
+                    <PopoverContent usePortal={false} side="bottom" align="center" className="w-48 p-4 bg-zinc-900/95 border-zinc-700/50 backdrop-blur-md" sideOffset={8}>
+                        <div 
+                            className="flex flex-col gap-3" 
+                            onPointerDown={(e) => e.stopPropagation()} 
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onMouseDownCapture={(e) => e.stopPropagation()}
+                        >
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs font-medium text-zinc-300">Opacity</span>
+                                <span className="text-xs text-zinc-400">{widgetOpacity}%</span>
+                            </div>
+                            <Slider
+                                value={[widgetOpacity]}
+                                onValueChange={(val) => setWidgetOpacity(val[0])}
+                                min={5}
+                                max={100}
+                                step={5}
+                            />
+                        </div>
+                    </PopoverContent>
+                </Popover>
+
+                {/* Keyboard Shortcuts */}
+                <Popover open={isShortcutsOpen} onOpenChange={setIsShortcutsOpen}>
+                    <PopoverTrigger asChild>
+                        <IconButton
+                            id="btn-keyboard-shortcuts"
+                            title="Keyboard Shortcuts"
+                        >
+                            <Keyboard className="w-4 h-4" />
+                        </IconButton>
+                    </PopoverTrigger>
+                    <PopoverContent 
+                        usePortal={false} 
+                        side="bottom" 
+                        align="center" 
+                        className="w-80 p-0 bg-zinc-900/95 border-zinc-700/50 backdrop-blur-md" 
+                        sideOffset={8}
+                    >
+                        <div 
+                            onPointerDown={(e) => e.stopPropagation()} 
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onMouseDownCapture={(e) => e.stopPropagation()}
+                        >
+                            <ShortcutsReference onClose={() => setIsShortcutsOpen(false)} />
+                        </div>
+                    </PopoverContent>
+                </Popover>
 
                 {/* Back to Dashboard */}
                 <IconButton

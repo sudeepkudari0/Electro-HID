@@ -196,6 +196,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
             'shortcut:toggle-recording',
             'shortcut:region-capture',
             'shortcut:toggle-teleprompter',
+            'shortcut:opacity-up',
+            'shortcut:opacity-down',
         ];
         if (validChannels.includes(channel)) {
             ipcRenderer.on(channel, callback);

@@ -1057,4 +1057,14 @@ export function registerGlobalShortcuts(mainWindow: BrowserWindow): void {
     globalShortcut.register('CommandOrControl+Shift+T', () => {
         mainWindow.webContents.send('shortcut:toggle-teleprompter');
     });
+
+    // Ctrl+Shift+Up → Increase opacity
+    globalShortcut.register('CommandOrControl+Shift+Up', () => {
+        mainWindow.webContents.send('shortcut:opacity-up');
+    });
+
+    // Ctrl+Shift+Down → Decrease opacity
+    globalShortcut.register('CommandOrControl+Shift+Down', () => {
+        mainWindow.webContents.send('shortcut:opacity-down');
+    });
 }

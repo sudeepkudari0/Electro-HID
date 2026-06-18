@@ -11,6 +11,7 @@ interface UIState {
     isCodeMode: boolean;
     useBulletPoints: boolean;
     isTeleprompterMode: boolean;
+    widgetOpacity: number;
 
     // Actions
     toggleExpanded: () => void;
@@ -27,6 +28,7 @@ interface UIState {
     toggleCodeMode: () => void;
     toggleBulletPoints: () => void;
     toggleTeleprompterMode: () => void;
+    setWidgetOpacity: (opacity: number) => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -40,6 +42,7 @@ export const useUIStore = create<UIState>((set) => ({
     isCodeMode: false,
     useBulletPoints: false,
     isTeleprompterMode: false,
+    widgetOpacity: 100,
 
     // Actions
     toggleExpanded: () =>
@@ -117,4 +120,6 @@ export const useUIStore = create<UIState>((set) => ({
     toggleCodeMode: () => set((state) => ({ isCodeMode: !state.isCodeMode })),
 
     toggleTeleprompterMode: () => set((state) => ({ isTeleprompterMode: !state.isTeleprompterMode })),
+
+    setWidgetOpacity: (opacity) => set({ widgetOpacity: opacity }),
 }));
