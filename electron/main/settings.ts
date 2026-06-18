@@ -37,9 +37,10 @@ export interface AppSettings {
     tailorModel: string;
     applyLlmProvider: 'ollama' | 'openai' | 'gemini' | 'groq';
     applyModel: string;
+    autoAnswerConfidenceThreshold: number; // 0-1, questions above this confidence auto-generate answers
 }
 
-const CURRENT_VERSION = 17;
+const CURRENT_VERSION = 18;
 
 const DEFAULT_SETTINGS: AppSettings = {
     version: CURRENT_VERSION,
@@ -76,6 +77,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     tailorModel: 'gemini-2.0-flash',
     applyLlmProvider: 'openai',
     applyModel: 'gpt-4o-mini',
+    autoAnswerConfidenceThreshold: 0.8,
 };
 
 // Migration map: version number -> transform function
@@ -226,6 +228,14 @@ const MIGRATIONS: Record<number, (settings: any) => any> = {
             applyLlmProvider: settings.openaiApiKey ? 'openai' : 'ollama',
             applyModel: settings.openaiModel || 'gpt-4o-mini',
             version: 17,
+        };
+    },
+    17: (settings: any) => {
+        // v17 -> v18: Add auto-answer confidence threshold
+        return {
+            ...settings,
+            autoAnswerConfidenceThreshold: 0.8,
+            version: 18,
         };
     },
 };

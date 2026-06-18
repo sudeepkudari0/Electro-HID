@@ -245,5 +245,41 @@ contextBridge.exposeInMainWorld('electronAPI', {
             ipcRenderer.on('window:state-changed', handler);
             return () => ipcRenderer.removeListener('window:state-changed', handler);
         }
-    }
+    },
+
+    // Deepgram Streaming STT API
+    deepgram: {
+        startStream: async () => {
+            return await ipcRenderer.invoke('deepgram:start-stream');
+        },
+        startSystemSession: async () => {
+            return await ipcRenderer.invoke('deepgram:start-system-session');
+        },
+        sendAudio: async (speaker: 'user' | 'interviewer', audioData: number[]) => {
+            return await ipcRenderer.invoke('deepgram:send-audio', { speaker, audioData });
+        },
+        stopStream: async () => {
+            return await ipcRenderer.invoke('deepgram:stop-stream');
+        },
+        onTranscript: (callback: (data: any) => void) => {
+            const handler = (_event: any, data: any) => callback(data);
+            ipcRenderer.on('deepgram:transcript', handler);
+            return () => ipcRenderer.removeListener('deepgram:transcript', handler);
+        },
+        onUtteranceEnd: (callback: (data: { speaker: string }) => void) => {
+            const handler = (_event: any, data: { speaker: string }) => callback(data);
+            ipcRenderer.on('deepgram:utterance-end', handler);
+            return () => ipcRenderer.removeListener('deepgram:utterance-end', handler);
+        },
+        onSpeechStarted: (callback: (data: { speaker: string }) => void) => {
+            const handler = (_event: any, data: { speaker: string }) => callback(data);
+            ipcRenderer.on('deepgram:speech-started', handler);
+            return () => ipcRenderer.removeListener('deepgram:speech-started', handler);
+        },
+        onError: (callback: (data: { error: string }) => void) => {
+            const handler = (_event: any, data: { error: string }) => callback(data);
+            ipcRenderer.on('deepgram:error', handler);
+            return () => ipcRenderer.removeListener('deepgram:error', handler);
+        },
+    },
 });

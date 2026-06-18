@@ -12,6 +12,7 @@ interface UseMixedAudioRecorderReturn {
     stopRecording: () => void;
     clearChunks: () => void;
     audioLevels: { mic: number; system: number };
+    isDeepgramStreaming: boolean;
 }
 
 /**
@@ -107,7 +108,88 @@ class ChunkRecorder {
 }
 
 /**
- * Mixed audio recorder with Silero VAD (Utterance-based) or continuous Chunks mode.
+ * DeepgramStreamForwarder — captures raw PCM audio and sends it to the
+ * main process via IPC for Deepgram WebSocket streaming. Sends every ~250ms
+ * for near-real-time transcription.
+ */
+class DeepgramStreamForwarder {
+    private audioContext: AudioContext | null = null;
+    private processor: ScriptProcessorNode | null = null;
+    private sourceNode: MediaStreamAudioSourceNode | null = null;
+    private buffer: number[] = [];
+    private intervalId: any = null;
+
+    constructor(
+        private stream: MediaStream,
+        private source: SpeakerSource,
+        private setLevel: (level: number) => void
+    ) {}
+
+    start() {
+        try {
+            const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+            this.audioContext = new AudioContextClass({ sampleRate: 16000 });
+            this.sourceNode = this.audioContext!.createMediaStreamSource(this.stream);
+            
+            this.processor = this.audioContext!.createScriptProcessor(4096, 1, 1);
+            
+            this.sourceNode.connect(this.processor);
+            this.processor.connect(this.audioContext!.destination);
+
+            this.processor.onaudioprocess = (e) => {
+                const inputData = e.inputBuffer.getChannelData(0);
+                
+                let sum = 0;
+                for (let i = 0; i < inputData.length; i++) {
+                    sum += inputData[i] * inputData[i];
+                    this.buffer.push(inputData[i]);
+                }
+                const rms = Math.sqrt(sum / inputData.length);
+                this.setLevel(rms);
+            };
+
+            // Flush buffer every 250ms to Deepgram via IPC
+            this.intervalId = setInterval(() => {
+                if (this.buffer.length > 0) {
+                    const chunk = this.buffer;
+                    this.buffer = [];
+                    
+                    // Send raw PCM to main process (no energy check — Deepgram handles VAD)
+                    window.electronAPI?.deepgram?.sendAudio(this.source, chunk);
+                }
+            }, 250);
+            
+            logger.info(`DeepgramStreamForwarder [${this.source}] started (250ms intervals).`);
+        } catch (error) {
+            logger.error(`Failed to start DeepgramStreamForwarder [${this.source}]:`, error);
+        }
+    }
+
+    stop() {
+        if (this.intervalId) {
+            clearInterval(this.intervalId);
+            this.intervalId = null;
+        }
+        if (this.processor) {
+            try { this.processor.disconnect(); } catch {}
+            this.processor.onaudioprocess = null;
+            this.processor = null;
+        }
+        if (this.sourceNode) {
+            try { this.sourceNode.disconnect(); } catch {}
+            this.sourceNode = null;
+        }
+        if (this.audioContext) {
+            try { this.audioContext.close(); } catch {}
+            this.audioContext = null;
+        }
+        this.buffer = [];
+        logger.info(`DeepgramStreamForwarder [${this.source}] stopped.`);
+    }
+}
+
+/**
+ * Mixed audio recorder with Silero VAD (Utterance-based), continuous Chunks, or Deepgram Streaming mode.
  *
  * @param onNewChunk - Called when a complete utterance/chunk is ready for transcription
  * @param onInterviewerUtteranceEnd - Called when the interviewer finishes speaking (VAD only)
@@ -119,6 +201,7 @@ export function useMixedAudioRecorder(
     onInterviewerSpeechStart?: () => void
 ): UseMixedAudioRecorderReturn {
     const [audioLevels, setAudioLevels] = useState({ mic: 0, system: 0 });
+    const [isDeepgramStreaming, setIsDeepgramStreaming] = useState(false);
     const audioLevelDecayRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const micStreamRef = useRef<MediaStream | null>(null);
     const systemStreamRef = useRef<MediaStream | null>(null);
@@ -130,6 +213,10 @@ export function useMixedAudioRecorder(
     // Chunks Mode refs
     const micRecorderRef = useRef<ChunkRecorder | null>(null);
     const systemRecorderRef = useRef<ChunkRecorder | null>(null);
+
+    // Deepgram Stream Mode refs
+    const micForwarderRef = useRef<DeepgramStreamForwarder | null>(null);
+    const systemForwarderRef = useRef<DeepgramStreamForwarder | null>(null);
 
     const onNewChunkRef = useRef(onNewChunk);
     const onInterviewerUtteranceEndRef = useRef(onInterviewerUtteranceEnd);
@@ -150,9 +237,11 @@ export function useMixedAudioRecorder(
     const startRecording = useCallback(async () => {
         try {
             const settingsRes = await window.electronAPI.getSettings();
+            const sttEngine = settingsRes.success && settingsRes.settings ? settingsRes.settings.sttEngine : 'moonshine';
             const mode = settingsRes.success && settingsRes.settings ? settingsRes.settings.sttMode : 'vad';
+            const useDeepgramStreaming = sttEngine === 'deepgram';
             
-            logger.info(`Starting audio recording (Mode: ${mode})...`);
+            logger.info(`Starting audio recording (Engine: ${sttEngine}, Mode: ${useDeepgramStreaming ? 'deepgram-stream' : mode})...`);
             const assetBasePath = import.meta.env.BASE_URL || '/';
             
             const micStream = await navigator.mediaDevices.getUserMedia({
@@ -165,6 +254,8 @@ export function useMixedAudioRecorder(
             });
             micStreamRef.current = micStream;
 
+            // Capture system audio
+            let hasSystemAudio = false;
             try {
                 const sources = await window.electronAPI.getDesktopSources();
                 const screenSource = sources.find((s: any) => s.type === 'screen');
@@ -190,20 +281,54 @@ export function useMixedAudioRecorder(
                         },
                     });
                     
-                    // We only need the audio track for VAD processing
                     const sysAudioStream = new MediaStream(systemStream.getAudioTracks());
                     systemStreamRef.current = sysAudioStream;
+                    hasSystemAudio = sysAudioStream.getAudioTracks().length > 0;
                     
-                    // Stop the video track as we don't use it
                     systemStream.getVideoTracks().forEach((track: any) => track.stop());
-                    
                     logger.info('System audio capture successful.');
                 }
             } catch (err) {
                 logger.warn('System audio unavailable:', err);
             }
 
-            if (mode === 'chunks') {
+            if (useDeepgramStreaming) {
+                // ═══ Deepgram Streaming Mode ═══
+                logger.info('Initializing Deepgram WebSocket streaming...');
+                setIsDeepgramStreaming(true);
+
+                // Start the Deepgram WebSocket session (mic channel)
+                const startResult = await window.electronAPI.deepgram.startStream();
+                if (!startResult.success) {
+                    throw new Error(`Failed to start Deepgram stream: ${startResult.error}`);
+                }
+
+                // Start mic forwarder
+                if (micStreamRef.current) {
+                    micForwarderRef.current = new DeepgramStreamForwarder(
+                        micStreamRef.current,
+                        'user',
+                        (level) => setAudioLevels(prev => ({ ...prev, mic: Math.min(level * 5, 1) }))
+                    );
+                    micForwarderRef.current.start();
+                }
+
+                // Start system audio forwarder + system WebSocket session
+                if (hasSystemAudio && systemStreamRef.current) {
+                    try {
+                        await window.electronAPI.deepgram.startSystemSession();
+                        systemForwarderRef.current = new DeepgramStreamForwarder(
+                            systemStreamRef.current,
+                            'interviewer',
+                            (level) => setAudioLevels(prev => ({ ...prev, system: Math.min(level * 5, 1) }))
+                        );
+                        systemForwarderRef.current.start();
+                    } catch (err) {
+                        logger.warn('Failed to start Deepgram system session:', err);
+                    }
+                }
+
+            } else if (mode === 'chunks') {
                 // Initialize Chunks Mode
                 logger.info('Initializing Continuous Chunk Recorders...');
                 
@@ -217,7 +342,7 @@ export function useMixedAudioRecorder(
                     micRecorderRef.current.start();
                 }
                 
-                if (systemStreamRef.current && systemStreamRef.current.getAudioTracks().length > 0) {
+                if (hasSystemAudio && systemStreamRef.current) {
                     systemRecorderRef.current = new ChunkRecorder(
                         systemStreamRef.current,
                         'interviewer',
@@ -250,7 +375,6 @@ export function useMixedAudioRecorder(
                         redemptionMs: 600,
                         submitUserSpeechOnPause: true,
                         onFrameProcessed: (_probabilities, frame) => {
-                            // Compute real-time level (RMS) for bouncing waveform visualizer in VAD mode
                             let sum = 0;
                             for (let i = 0; i < frame.length; i++) {
                                 sum += frame[i] * frame[i];
@@ -270,7 +394,6 @@ export function useMixedAudioRecorder(
                         onSpeechEnd: (audio: Float32Array) => {
                             logger.debug(`VAD [${source}]: Speech ended. Length: ${(audio.length / 16000).toFixed(1)}s`);
                             
-                            // Energy-based pre-filter to catch silent/noise frames that VAD might have misclassified
                             if (hasSignificantEnergy(audio)) {
                                 onNewChunkRef.current?.(source, audio);
                             } else {
@@ -294,7 +417,7 @@ export function useMixedAudioRecorder(
                     micVADRef.current.start();
                 }
                 
-                if (systemStreamRef.current && systemStreamRef.current.getAudioTracks().length > 0) {
+                if (hasSystemAudio && systemStreamRef.current) {
                     systemVADRef.current = await createVAD(systemStreamRef.current, 'interviewer');
                     systemVADRef.current.start();
                 }
@@ -315,6 +438,23 @@ export function useMixedAudioRecorder(
     }, []);
 
     const stopRecording = useCallback(() => {
+        // Stop Deepgram Stream Mode Forwarders
+        if (micForwarderRef.current) {
+            micForwarderRef.current.stop();
+            micForwarderRef.current = null;
+        }
+        if (systemForwarderRef.current) {
+            systemForwarderRef.current.stop();
+            systemForwarderRef.current = null;
+        }
+        // Stop the Deepgram WebSocket sessions
+        if (isDeepgramStreaming) {
+            window.electronAPI?.deepgram?.stopStream().catch((err: any) => {
+                logger.error('Failed to stop Deepgram stream:', err);
+            });
+            setIsDeepgramStreaming(false);
+        }
+
         // Stop Chunks Mode Recorders
         if (micRecorderRef.current) {
             micRecorderRef.current.stop();
@@ -327,7 +467,7 @@ export function useMixedAudioRecorder(
 
         // Stop VAD Mode VADs
         if (micVADRef.current) {
-            micVADRef.current.pause(); // Setting submitUserSpeechOnPause to true ensures pending audio is processed
+            micVADRef.current.pause();
             micVADRef.current.destroy();
             micVADRef.current = null;
         }
@@ -352,7 +492,7 @@ export function useMixedAudioRecorder(
         }
         setAudioLevels({ mic: 0, system: 0 });
 
-    }, []);
+    }, [isDeepgramStreaming]);
 
     const clearChunks = useCallback(() => {}, []);
 
@@ -361,5 +501,6 @@ export function useMixedAudioRecorder(
         stopRecording,
         clearChunks,
         audioLevels,
+        isDeepgramStreaming,
     };
 }

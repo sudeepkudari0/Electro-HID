@@ -91,6 +91,8 @@ function App(): JSX.Element {
           setSttEngine("Whisper.cpp");
           setSttModel(res.settings.whisperModel || "small.en");
         }
+
+        autoAnswerConfidenceThresholdRef.current = res.settings.autoAnswerConfidenceThreshold ?? 0.8;
       }
     });
   }, []);
@@ -138,6 +140,8 @@ function App(): JSX.Element {
     null,
   );
   const lastDetectionTimeRef = useRef<number>(0);
+  const autoAnswerConfidenceThresholdRef = useRef<number>(0.8);
+  const deepgramFinalTextRef = useRef<{ user: string; interviewer: string }>({ user: "", interviewer: "" });
 
   // Sync conversationRef with store
   useEffect(() => {
@@ -314,6 +318,103 @@ function App(): JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isModelLoaded, transcribe, setConversation]);
 
+  // ─── Deepgram Streaming Event Listeners ───
+  useEffect(() => {
+    if (!window.electronAPI?.deepgram) return;
+
+    const unsubscribers: (() => void)[] = [];
+
+    // On Transcript
+    unsubscribers.push(
+      window.electronAPI.deepgram.onTranscript((data: any) => {
+        const text = data.text;
+        const source = data.speaker as "user" | "interviewer";
+        const words = data.words;
+        
+        // Cross-channel echo suppression.
+        // We only record the user's voice. We DO NOT record the interviewer's voice 
+        // into the echo suppressor because Deepgram's interim updates would match 
+        // themselves (same-channel) and suppress the rest of the sentence.
+        if (source === "user") {
+            echoSuppressorRef.current.recordUserTranscription(text);
+        } else if (source === "interviewer") {
+            if (echoSuppressorRef.current.isEcho(text)) {
+                return; // Skip echo (it matched the user's mic)
+            }
+        }
+
+        setConversation((prev: ChatBlock[]) => {
+            const newConv = [...prev];
+            const lastBlock =
+            newConv.length > 0 ? newConv[newConv.length - 1] : null;
+
+            if (!lastBlock || lastBlock.speaker !== source) {
+                // Speaker changed or first block: reset final text for this source
+                deepgramFinalTextRef.current[source] = "";
+                const fullText = text;
+                
+                newConv.push({
+                    id: Date.now().toString() + Math.random().toString(),
+                    speaker: source,
+                    text: fullText,
+                    timestamp: new Date(),
+                });
+
+                if (data.isFinal) {
+                    deepgramFinalTextRef.current[source] = fullText;
+                }
+            } else {
+                // Same speaker: append current interim/final to previously finalized text
+                const previouslyFinalized = deepgramFinalTextRef.current[source];
+                const fullText = previouslyFinalized + (previouslyFinalized && text ? " " : "") + text;
+                
+                newConv[newConv.length - 1] = { ...lastBlock, text: fullText };
+
+                if (data.isFinal) {
+                    deepgramFinalTextRef.current[source] = fullText;
+                }
+            }
+
+            conversationRef.current = newConv;
+
+            if (source === "user" && autoDetectTimeoutRef.current) {
+                clearTimeout(autoDetectTimeoutRef.current);
+                autoDetectTimeoutRef.current = null;
+            }
+
+            if (source === "interviewer" && autoDetectTimeoutRef.current) {
+                console.log("[Detection] New interviewer text arrived — resetting detection window");
+                clearTimeout(autoDetectTimeoutRef.current);
+                autoDetectTimeoutRef.current = null;
+                startDetectionWindow();
+            }
+
+            return newConv;
+        });
+      })
+    );
+
+    // On Utterance End
+    unsubscribers.push(
+      window.electronAPI.deepgram.onUtteranceEnd((data: { speaker: string }) => {
+        if (data.speaker === 'interviewer') {
+          handleInterviewerSpeechEnd();
+        }
+      })
+    );
+
+    // On Speech Started
+    unsubscribers.push(
+      window.electronAPI.deepgram.onSpeechStarted((data: { speaker: string }) => {
+        if (data.speaker === 'interviewer') {
+          handleInterviewerSpeechStart();
+        }
+      })
+    );
+
+    return () => unsubscribers.forEach(unsub => unsub());
+  }, []);
+
   // Expose transcription handler for E2E testing
   if (typeof window !== "undefined") {
     (window as any).__TEST_PROCESS_TRANSCRIPTION__ = (
@@ -339,14 +440,11 @@ function App(): JSX.Element {
   }
 
   // ─── Detection Window ───
-  // Instead of auto-answering, we now just ADD the question to the candidates list.
-  // The user will click to trigger answer generation.
-
-  const DETECTION_WINDOW_MS = 3500;
+  const DETECTION_WINDOW_MS = 1500;
 
   const startDetectionWindow = useCallback(() => {
-    // 6s cooldown between detections to avoid flooding the candidates list
-    if (Date.now() - lastDetectionTimeRef.current < 6000) return;
+    // 3s cooldown between detections to avoid flooding the candidates list
+    if (Date.now() - lastDetectionTimeRef.current < 3000) return;
 
     autoDetectTimeoutRef.current = setTimeout(() => {
       autoDetectTimeoutRef.current = null;
@@ -370,11 +468,17 @@ function App(): JSX.Element {
       if (detection.isQuestion) {
         lastDetectionTimeRef.current = Date.now();
         // Add to candidates list — deduplication happens inside the store
-        addCandidateQuestion(
+        const candidateId = addCandidateQuestion(
           lastInterviewerBlock.text,
           detection.confidence,
           detection.signals,
         );
+
+        // Auto-generate answer for high-confidence questions
+        if (candidateId && detection.confidence >= autoAnswerConfidenceThresholdRef.current) {
+            console.log(`[Detection] Auto-generating answer for candidate ${candidateId} (confidence ${detection.confidence.toFixed(2)} >= ${autoAnswerConfidenceThresholdRef.current})`);
+            handlePickQuestionRef.current(candidateId, lastInterviewerBlock.text);
+        }
       }
     }, DETECTION_WINDOW_MS);
   }, [autoDetectionEnabled, addCandidateQuestion]);
@@ -479,6 +583,13 @@ function App(): JSX.Element {
     }
   };
 
+  // We need to pass handlePickQuestion down to the dependency array in startDetectionWindow,
+  // but to avoid circular dependencies we can use a ref for the latest handlePickQuestion.
+  const handlePickQuestionRef = useRef(handlePickQuestion);
+  useEffect(() => {
+    handlePickQuestionRef.current = handlePickQuestion;
+  }, [handlePickQuestion]);
+
   // ─── Manual generate (Ctrl+Shift+G) → add as candidate and immediately generate answer ───
   const handleGenerateAnswer = async () => {
     const lastInterviewerBlock = [...conversationRef.current]
@@ -547,6 +658,7 @@ function App(): JSX.Element {
         isTranscribingRef.current = false;
         userStabilizerRef.current.clear();
         interviewerStabilizerRef.current.clear();
+        deepgramFinalTextRef.current = { user: "", interviewer: "" };
         clearTranscript();
         conversationRef.current = [];
         clearChunks();
@@ -628,6 +740,7 @@ function App(): JSX.Element {
   const handleClearTranscript = () => {
     userStabilizerRef.current.clear();
     interviewerStabilizerRef.current.clear();
+    deepgramFinalTextRef.current = { user: "", interviewer: "" };
     clearTranscript();
     conversationRef.current = [];
     if (autoDetectTimeoutRef.current) {

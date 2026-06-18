@@ -190,6 +190,17 @@ interface ElectronAPI {
       callback: (state: { isMaximized: boolean }) => void,
     ) => () => void;
   };
+
+  deepgram: {
+    startStream: () => Promise<{ success: boolean; error?: string }>;
+    startSystemSession: () => Promise<{ success: boolean; error?: string }>;
+    sendAudio: (speaker: 'user' | 'interviewer', audioData: number[]) => Promise<{ success: boolean; error?: string }>;
+    stopStream: () => Promise<{ success: boolean; error?: string }>;
+    onTranscript: (callback: (data: any) => void) => () => void;
+    onUtteranceEnd: (callback: (data: { speaker: string }) => void) => () => void;
+    onSpeechStarted: (callback: (data: { speaker: string }) => void) => () => void;
+    onError: (callback: (data: { error: string }) => void) => () => void;
+  };
 }
 
 declare global {

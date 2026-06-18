@@ -68,13 +68,13 @@ export function createDashboardWindow(): BrowserWindow {
     icon: resolveIcon(),
     titleBarStyle: "hidden",
     titleBarOverlay:
-      process.platform === "darwin"
-        ? {
-            color: "#0f1117",
+      process.platform === "linux"
+        ? false
+        : {
+            color: "#09090b",
             symbolColor: "#94a3b8",
             height: 36,
-          }
-        : false,
+          },
     webPreferences: {
       preload: path.join(__dirname, "../preload/index.cjs"),
       contextIsolation: true,

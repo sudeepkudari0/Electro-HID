@@ -99,4 +99,8 @@ export const IPC_CHANNELS = {
     SWITCH_TO_INTERVIEW: 'window:switch-interview',
     SWITCH_TO_DASHBOARD: 'window:switch-dashboard',
     OPEN_EXTERNAL: 'shell:open-external',
+    // Deepgram Streaming STT
+    DEEPGRAM_START_STREAM: 'deepgram:start-stream',
+    DEEPGRAM_SEND_AUDIO: 'deepgram:send-audio',
+    DEEPGRAM_STOP_STREAM: 'deepgram:stop-stream',
 } as const;

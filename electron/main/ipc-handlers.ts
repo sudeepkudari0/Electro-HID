@@ -896,6 +896,90 @@ Be concise but thorough. Use bullet points and code blocks where appropriate.`;
         const win = BrowserWindow.fromWebContents(event.sender);
         return win ? win.isMaximized() : false;
     });
+
+    // ── Deepgram Streaming STT ──────────────────────────────────────────
+
+    ipcMain.handle(IPC_CHANNELS.DEEPGRAM_START_STREAM, async (event) => {
+        try {
+            const { getDeepgramStreamingManager } = await import('./whisper/deepgram-streaming');
+            const manager = getDeepgramStreamingManager();
+
+            await manager.start({
+                onTranscript: (evt) => {
+                    try {
+                        event.sender.send('deepgram:transcript', evt);
+                    } catch { /* sender may be destroyed */ }
+                },
+                onUtteranceEnd: (speaker) => {
+                    try {
+                        event.sender.send('deepgram:utterance-end', { speaker });
+                    } catch { /* sender may be destroyed */ }
+                },
+                onSpeechStarted: (speaker) => {
+                    try {
+                        event.sender.send('deepgram:speech-started', { speaker });
+                    } catch { /* sender may be destroyed */ }
+                },
+                onError: (error) => {
+                    console.error('[Deepgram Stream] Error:', error);
+                    try {
+                        event.sender.send('deepgram:error', { error });
+                    } catch { /* sender may be destroyed */ }
+                },
+            });
+
+            return { success: true };
+        } catch (error) {
+            console.error('IPC: Deepgram start-stream failed:', error);
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : String(error),
+            };
+        }
+    });
+
+    ipcMain.handle(IPC_CHANNELS.DEEPGRAM_SEND_AUDIO, async (event, params: { speaker: 'user' | 'interviewer'; audioData: number[] }) => {
+        try {
+            const { getDeepgramStreamingManager } = await import('./whisper/deepgram-streaming');
+            const manager = getDeepgramStreamingManager();
+
+            if (!manager.active) {
+                return { success: false, error: 'Streaming not active' };
+            }
+
+            const pcmFloat32 = new Float32Array(params.audioData);
+            manager.sendAudio(params.speaker, pcmFloat32);
+
+            return { success: true };
+        } catch (error) {
+            return { success: false, error: String(error) };
+        }
+    });
+
+    ipcMain.handle(IPC_CHANNELS.DEEPGRAM_STOP_STREAM, async () => {
+        try {
+            const { getDeepgramStreamingManager } = await import('./whisper/deepgram-streaming');
+            const manager = getDeepgramStreamingManager();
+            await manager.stop();
+            return { success: true };
+        } catch (error) {
+            console.error('IPC: Deepgram stop-stream failed:', error);
+            return { success: false, error: String(error) };
+        }
+    });
+
+    // Start system session separately (called after system audio capture succeeds)
+    ipcMain.handle('deepgram:start-system-session', async (event) => {
+        try {
+            const { getDeepgramStreamingManager } = await import('./whisper/deepgram-streaming');
+            const manager = getDeepgramStreamingManager();
+            await manager.startSystemSession();
+            return { success: true };
+        } catch (error) {
+            console.error('IPC: Deepgram start-system-session failed:', error);
+            return { success: false, error: String(error) };
+        }
+    });
 }
 
 /**

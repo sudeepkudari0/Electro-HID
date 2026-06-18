@@ -100,7 +100,7 @@ interface AnswerState {
     isGenerating: boolean;
 
     // ─── Candidate question actions ───
-    addCandidateQuestion: (text: string, confidence: number, signals: string[]) => void;
+    addCandidateQuestion: (text: string, confidence: number, signals: string[]) => string;
     removeCandidateQuestion: (id: string) => void;
     clearCandidateQuestions: () => void;
     setCandidateStatus: (id: string, status: CandidateQuestion['status']) => void;
@@ -135,7 +135,8 @@ export const useAnswerStore = create<AnswerState>((set) => ({
 
     // ─── Candidate question actions ───
 
-    addCandidateQuestion: (text, confidence, signals) =>
+    addCandidateQuestion: (text, confidence, signals) => {
+        let returnedId = '';
         set((state) => {
             const dupIndex = findDuplicateIndex(state.candidateQuestions, text);
 
@@ -153,12 +154,15 @@ export const useAnswerStore = create<AnswerState>((set) => ({
                     timestamp: new Date(), // Update timestamp
                 };
 
+                returnedId = existing.id;
                 return { candidateQuestions: updated };
             }
 
             // No duplicate — add as new candidate
+            const newId = Date.now().toString() + Math.random().toString(36).slice(2, 6);
+            returnedId = newId;
             const newCandidate: CandidateQuestion = {
-                id: Date.now().toString() + Math.random().toString(36).slice(2, 6),
+                id: newId,
                 text,
                 timestamp: new Date(),
                 confidence,
@@ -169,7 +173,9 @@ export const useAnswerStore = create<AnswerState>((set) => ({
             return {
                 candidateQuestions: [newCandidate, ...state.candidateQuestions], // newest first
             };
-        }),
+        });
+        return returnedId;
+    },
 
     removeCandidateQuestion: (id) =>
         set((state) => ({
