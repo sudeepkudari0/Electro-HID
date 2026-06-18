@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigationStore, type AppModule } from '../state/navigation-store';
 import { CareerHub } from './CareerHub/CareerHub';
 import { SettingsPanel } from '../components/SettingsPanel/SettingsPanel';
+import { InterviewPrepLanding } from './InterviewPrep/InterviewPrepLanding';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 export function Dashboard() {
@@ -72,15 +73,15 @@ export function Dashboard() {
           <div className={isCollapsed ? "mt-4 mb-2" : "mt-8 mb-4"}>
              {!isCollapsed && <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-4 px-2">Tools</div>}
              <button
-                onClick={() => setActiveModule('interview')}
+                onClick={() => setActiveModule('interview-prep')}
                 className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all duration-200 text-slate-400 hover:bg-indigo-500/10 hover:text-indigo-300 group ${
                   isCollapsed ? 'justify-center' : ''
                 }`}
-                title={isCollapsed ? "Interview Practice" : undefined}
+                title={isCollapsed ? "Interview Prep" : undefined}
               >
                 <div className="flex items-center gap-3">
                   <span className="text-lg">🎙️</span>
-                  {!isCollapsed && <span className="text-sm">Interview Practice</span>}
+                  {!isCollapsed && <span className="text-sm">Interview Prep</span>}
                 </div>
                 {!isCollapsed && <span className="opacity-0 group-hover:opacity-100 transition-opacity text-indigo-400">↗</span>}
               </button>
@@ -105,6 +106,7 @@ export function Dashboard() {
         <div className="absolute inset-0 overflow-auto">
           {activeModule === 'dashboard' && <OverviewPanel />}
           {activeModule === 'career-hub' && <CareerHub />}
+          {activeModule === 'interview-prep' && <InterviewPrepLanding />}
           {activeModule === 'settings' && (
             <div className="p-8 max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
               <SettingsPanel onClose={() => setActiveModule('dashboard')} onSettingsChanged={() => {}} />
@@ -152,7 +154,7 @@ function OverviewPanel() {
 
         {/* Interview Practice Card */}
         <div 
-          onClick={() => setActiveModule('interview')}
+          onClick={() => setActiveModule('interview-prep')}
           className="group cursor-pointer relative overflow-hidden rounded-3xl bg-gradient-to-b from-white/[0.04] to-transparent border border-white/10 p-8 hover:border-purple-500/30 transition-all duration-500 hover:shadow-[0_0_40px_rgba(168,85,247,0.1)]"
         >
           <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
@@ -166,12 +168,12 @@ function OverviewPanel() {
               <line x1="8" y1="23" x2="16" y2="23" />
             </svg>
           </div>
-          <h3 className="text-xl font-bold text-slate-200 mb-3">Interview Practice</h3>
+          <h3 className="text-xl font-bold text-slate-200 mb-3">Interview Prep</h3>
           <p className="text-slate-400 text-sm leading-relaxed mb-6 max-w-[280px]">
-            Start a practice session to get real-time delivery coaching, offline speech recognition, and LLM-generated feedback on your answers.
+            Review past mock interviews, track your performance scores, and start a new real-time practice session.
           </p>
           <div className="text-purple-400 text-sm font-medium flex items-center gap-1 group-hover:gap-2 transition-all">
-            Start Practice Session <span className="rotate-[-45deg]">→</span>
+            Open Dashboard <span>→</span>
           </div>
         </div>
       </div>

@@ -59,12 +59,14 @@ function App(): JSX.Element {
     isCapturing,
     isCodeMode,
     useBulletPoints,
+    isTeleprompterMode,
     toggleExpanded,
     setExpanded,
     toggleChat,
     toggleHistory,
     togglePractice,
     setCapturing,
+    toggleTeleprompterMode,
   } = useUIStore();
 
   // ─── App-level state ───
@@ -329,7 +331,6 @@ function App(): JSX.Element {
       window.electronAPI.deepgram.onTranscript((data: any) => {
         const text = data.text;
         const source = data.speaker as "user" | "interviewer";
-        const words = data.words;
         
         // Cross-channel echo suppression.
         // We only record the user's voice. We DO NOT record the interviewer's voice 
@@ -792,12 +793,17 @@ function App(): JSX.Element {
           handleRegionCapture();
         }),
       );
+      unsubscribers.push(
+        window.electronAPI.onShortcut("shortcut:toggle-teleprompter", () => {
+          toggleTeleprompterMode();
+        }),
+      );
     }
 
     return () => {
       unsubscribers.forEach((unsub) => unsub());
     };
-  }, [conversation, answers.length]);
+  }, [conversation, answers.length, toggleTeleprompterMode]);
 
   // ─── Region Capture ───
   const [regionSelectState, setRegionSelectState] = useState<{
@@ -870,23 +876,24 @@ function App(): JSX.Element {
     <>
       <FloatingWidget
         isExpanded={isExpanded}
-        isChatOpen={isChatOpen}
-        isHistoryOpen={isHistoryOpen}
-        isPracticeOpen={isPracticeOpen}
-        isRecording={isRecording}
-        isCapturing={isCapturing}
-        isGenerating={isGenerating}
-        sessionTime={sessionTime}
-        conversation={conversation}
-        isModelLoading={isModelLoading}
-        modelError={modelError}
-        candidateQuestions={candidateQuestions}
-        detectedQuestions={detectedQuestions}
-        expandedQuestionId={expandedQuestionId}
-        autoDetectionEnabled={autoDetectionEnabled}
-        sttEngine={sttEngine}
-        sttModel={sttModel}
-        audioLevels={audioLevels}
+          isChatOpen={isChatOpen}
+          isHistoryOpen={isHistoryOpen}
+          isPracticeOpen={isPracticeOpen}
+          isRecording={isRecording}
+          isCapturing={isCapturing}
+          isGenerating={isGenerating}
+          isTeleprompterMode={isTeleprompterMode}
+          sessionTime={sessionTime}
+          conversation={conversation}
+          isModelLoading={isModelLoading}
+          modelError={modelError}
+          candidateQuestions={candidateQuestions}
+          detectedQuestions={detectedQuestions}
+          expandedQuestionId={expandedQuestionId}
+          autoDetectionEnabled={autoDetectionEnabled}
+          sttEngine={sttEngine}
+          sttModel={sttModel}
+          audioLevels={audioLevels}
         onToggleExpanded={toggleExpanded}
         onToggleRecording={handleToggleRecording}
         onCaptureScreen={handleCaptureScreen}

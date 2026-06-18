@@ -167,6 +167,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
         return await ipcRenderer.invoke('llm:get-available-models', provider);
     },
 
+    // TTS API
+    tts: {
+        synthesize: async (text: string) => {
+            return await ipcRenderer.invoke('tts:synthesize', text);
+        }
+    },
+
     // Storage API
     session: {
         save: async (session: any) => ipcRenderer.invoke(IPC_CHANNELS.SESSION_SAVE, session),
@@ -188,6 +195,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
             'shortcut:toggle-widget',
             'shortcut:toggle-recording',
             'shortcut:region-capture',
+            'shortcut:toggle-teleprompter',
         ];
         if (validChannels.includes(channel)) {
             ipcRenderer.on(channel, callback);

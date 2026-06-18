@@ -17,13 +17,16 @@ Synapse AI is a privacy-first, offline desktop application designed to help you 
 
 ## ✨ Features
 
-- 🎤 **Offline Speech Recognition** - Real-time, 100% local transcription using Whisper.cpp or Moonshine ONNX pipelines, keeping all speech data completely private.
-- 🧠 **AI-Powered Answer Feedback** - Get structured answer suggestions and guidance using local LLMs (via Ollama) or cloud providers (OpenAI SDK).
+- 🎤 **Real-Time Speech Recognition** - Lightning-fast streaming transcription via Deepgram WebSocket API, with offline fallbacks using Whisper.cpp or Moonshine ONNX.
+- 🧠 **AI-Powered Answer Generation** - Get structured answer suggestions and follow-up questions using ultra-fast cloud providers (Groq, Gemini, OpenAI) or local LLMs (Ollama).
+- 👻 **Stealth Teleprompter Mode** - Floating, completely transparent, and click-through overlay mode for covert interview assistance that works on top of any video conferencing app.
+- 🎙️ **Interview Prep Dashboard** - A beautiful, aesthetic landing page that automatically tracks your historical practice sessions, including questions asked, session duration, and performance.
+- 🔄 **Smart Audio & Echo Suppression** - Advanced dual-channel audio capture (microphone + system audio) with cross-channel echo suppression for seamless back-and-forth mock interviews.
 - 📊 **Real-Time Delivery Analytics** - Keep track of pacing (words per minute), filler words (like "um", "ah", "like"), and talk-time ratios to improve your delivery flow.
 - 📝 **Resume-Aware Feedback** - Input your professional background summary to receive personalized answer suggestions tailored specifically to your unique experience.
 - ⭐ **STAR Method Suggestions** - Practice structuring your behavioral responses using the Situation, Task, Action, and Result (STAR) framework.
 - 📄 **Practice Session Scoring & PDF Export** - Review multi-dimensional scores for your answers and export complete practice session reports to PDF for offline review.
-- 💼 **Career Hub** - Search for active job listings across top platforms (compensating for blocked companies automatically), block companies to exclude them from future searches, and prepare specifically for those roles by importing their job descriptions directly into practice sessions.
+- 💼 **Career Hub** - Search for active job listings across top platforms, block companies, and prepare specifically for those roles by importing their job descriptions directly into practice sessions.
 
 ---
 

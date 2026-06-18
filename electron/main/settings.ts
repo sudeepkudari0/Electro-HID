@@ -10,6 +10,7 @@ export interface AppSettings {
     downloadedMoonshineModels: string[];
     deepgramApiKey: string;
     deepgramModel: string;
+    deepgramTtsModel: string;
     geminiApiKey: string;
     groqApiKey: string;
     geminiModel: string;
@@ -40,7 +41,7 @@ export interface AppSettings {
     autoAnswerConfidenceThreshold: number; // 0-1, questions above this confidence auto-generate answers
 }
 
-const CURRENT_VERSION = 18;
+const CURRENT_VERSION = 19;
 
 const DEFAULT_SETTINGS: AppSettings = {
     version: CURRENT_VERSION,
@@ -50,6 +51,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     downloadedMoonshineModels: [],
     deepgramApiKey: '',
     deepgramModel: 'nova-3',
+    deepgramTtsModel: 'aura-asteria-en',
     geminiApiKey: '',
     groqApiKey: '',
     geminiModel: 'gemini-2.0-flash',
@@ -236,6 +238,14 @@ const MIGRATIONS: Record<number, (settings: any) => any> = {
             ...settings,
             autoAnswerConfidenceThreshold: 0.8,
             version: 18,
+        };
+    },
+    18: (settings: any) => {
+        // v18 -> v19: Add deepgramTtsModel
+        return {
+            ...settings,
+            deepgramTtsModel: 'aura-asteria-en',
+            version: 19,
         };
     },
 };

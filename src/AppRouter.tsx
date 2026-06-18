@@ -19,6 +19,7 @@ import App from './App';
 function getModuleFromHash(): AppModule {
   const hash = window.location.hash.replace('#', '');
   if (hash === 'interview') return 'interview';
+  if (hash === 'interview-prep') return 'interview-prep';
   if (hash === 'career-hub') return 'career-hub';
   return 'dashboard';
 }
@@ -58,6 +59,9 @@ export function AppRouter() {
     // career-hub stays in the same dashboard window, just update hash
     if (activeModule === 'career-hub') {
       window.location.hash = 'career-hub';
+    }
+    if (activeModule === 'interview-prep') {
+      window.location.hash = 'interview-prep';
     }
     if (activeModule === 'dashboard') {
       window.location.hash = 'dashboard';

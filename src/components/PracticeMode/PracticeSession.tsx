@@ -5,6 +5,7 @@ import { useLLM } from '../../hooks/useLLM';
 import { getInterviewerPrompt } from '../../lib/prompts/templates/interviewer';
 import { getEvaluatorPrompt } from '../../lib/prompts/templates/evaluator';
 import { useProfile } from '../../hooks/useProfile';
+import { useTTS } from '../../hooks/useTTS';
 
 export const PracticeSession: React.FC = () => {
     const { 
@@ -22,6 +23,7 @@ export const PracticeSession: React.FC = () => {
     const { conversation, isRecording } = useSessionStore();
     const { profile } = useProfile();
     const { generateFromPromptTemplate } = useLLM();
+    const { speak, stop, isPlaying } = useTTS();
 
     const [isGeneratingQuestion, setIsGeneratingQuestion] = useState(false);
     const [isEvaluating, setIsEvaluating] = useState(false);
@@ -57,6 +59,7 @@ export const PracticeSession: React.FC = () => {
 
                 setPracticeQuestions([...practiceQuestions, newQuestion]);
                 setQuestionStartTime(Date.now());
+                speak(newQuestion.question);
 
             } catch (err) {
                 console.error("Failed to generate question", err);
@@ -66,12 +69,14 @@ export const PracticeSession: React.FC = () => {
         };
 
         generateNextQuestion();
-    }, [currentQuestionIndex, practiceConfig, practiceQuestions, profile]);
+    }, [currentQuestionIndex, practiceConfig, practiceQuestions, profile, speak]);
 
     const currentQuestion = practiceQuestions[currentQuestionIndex];
     const currentEvaluation = evaluations.find(e => e.questionId === currentQuestion?.id);
 
     const handleNext = async () => {
+        stop(); // Stop any currently playing audio
+
         if (isEvaluating || isGeneratingQuestion) return;
 
         if (currentEvaluation) {
@@ -149,7 +154,16 @@ export const PracticeSession: React.FC = () => {
                 ) : currentQuestion ? (
                     <div className="space-y-6">
                         <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
-                            <h3 className="text-sm font-medium text-blue-400 mb-2">Interviewer</h3>
+                            <div className="flex items-center space-x-2 mb-2">
+                                <h3 className="text-sm font-medium text-blue-400">Interviewer</h3>
+                                {isPlaying && (
+                                    <span className="flex items-center space-x-1">
+                                        <span className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                                        <span className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                                        <span className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                                    </span>
+                                )}
+                            </div>
                             <p className="text-lg">{currentQuestion.question}</p>
                         </div>
 

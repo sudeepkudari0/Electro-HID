@@ -112,6 +112,13 @@ interface ElectronAPI {
     provider: "gemini" | "groq",
   ) => Promise<{ success: boolean; models?: string[]; error?: string }>;
 
+  // TTS API
+  tts: {
+    synthesize: (
+      text: string,
+    ) => Promise<{ success: boolean; audio?: Buffer | ArrayBuffer; error?: string }>;
+  };
+
   // Storage API
   session: {
     save: (session: any) => Promise<{ success: boolean; error?: string }>;

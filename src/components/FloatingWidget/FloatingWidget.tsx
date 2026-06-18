@@ -6,6 +6,7 @@ import { AnswerSuggestions } from './AnswerSuggestions';
 import { ChatPanel } from '../ChatPanel/ChatPanel';
 import { SessionHistory } from '../SessionHistory/SessionHistory';
 import { SessionDetail } from '../SessionHistory/SessionDetail';
+import { TeleprompterView } from './TeleprompterView';
 import { PracticeMode } from '../PracticeMode/PracticeMode';
 import { MetricsBar } from '../DeliveryMetrics/MetricsBar';
 import { Shield } from 'lucide-react';
@@ -22,6 +23,7 @@ interface FloatingWidgetProps {
     isRecording: boolean;
     isCapturing: boolean;
     isGenerating: boolean;
+    isTeleprompterMode: boolean;
     sessionTime: number;
     conversation: ChatBlock[];
     isModelLoading: boolean;
@@ -64,6 +66,7 @@ export function FloatingWidget({
     isRecording,
     isCapturing,
     isGenerating,
+    isTeleprompterMode,
     sessionTime,
     conversation,
     isModelLoading,
@@ -145,11 +148,18 @@ export function FloatingWidget({
         if (!el) return;
 
         const handleEnter = () => {
-            window.electronAPI?.setIgnoreMouseEvents(false);
+            if (!isTeleprompterMode) {
+                window.electronAPI?.setIgnoreMouseEvents(false);
+            }
         };
         const handleLeave = () => {
             window.electronAPI?.setIgnoreMouseEvents(true);
         };
+
+        // If teleprompter mode turns on while mouse is already inside, force click-through
+        if (isTeleprompterMode) {
+            window.electronAPI?.setIgnoreMouseEvents(true);
+        }
 
         el.addEventListener('mouseenter', handleEnter);
         el.addEventListener('mouseleave', handleLeave);
@@ -158,7 +168,7 @@ export function FloatingWidget({
             el.removeEventListener('mouseenter', handleEnter);
             el.removeEventListener('mouseleave', handleLeave);
         };
-    }, []);
+    }, [isTeleprompterMode]);
 
     // Auto-expand when new candidate questions arrive
     useEffect(() => {
@@ -180,49 +190,65 @@ export function FloatingWidget({
         <div className="fixed top-0 right-0 w-full h-full pointer-events-none select-none z-50">
             <div
                 ref={widgetRef}
-                className={`widget pointer-events-auto ${isExpanded ? 'widget--expanded' : 'widget--collapsed'}`}
+                className={`widget pointer-events-auto ${isExpanded ? 'widget--expanded' : 'widget--collapsed'} ${isTeleprompterMode ? 'widget--teleprompter' : ''}`}
                 id="floating-widget"
                 style={{ 
-                    top: `${widgetPos.top}px`, 
-                    right: `${widgetPos.right}px`,
-                    ...(isExpanded ? {
+                    top: isTeleprompterMode ? 0 : `${widgetPos.top}px`, 
+                    right: isTeleprompterMode ? 0 : `${widgetPos.right}px`,
+                    ...(isExpanded && !isTeleprompterMode ? {
                         width: `${widgetSize.width}px`,
                         height: widgetSize.height !== -1 ? `${widgetSize.height}px` : undefined,
                         maxHeight: widgetSize.height !== -1 ? 'none' : undefined,
                     } : {})
                 }}
             >
-                {/* Resize Handles (only visible when expanded) */}
-                {isExpanded && (
+                {/* Drag handle for teleprompter mode */}
+                {isTeleprompterMode && (
+                    <div 
+                        className="drag-handle-teleprompter"
+                        onMouseDown={() => {
+                            // Basic drag implementation for the handle if needed
+                            // For a full-screen teleprompter this might not even be necessary, 
+                            // but we keep it just in case.
+                        }}
+                    />
+                )}
+
+                {/* Resize Handles (only visible when expanded and NOT teleprompter) */}
+                {isExpanded && !isTeleprompterMode && (
                     <>
                         <div className="resize-handle resize-handle-left" onMouseDown={onResizeLeft} />
                         <div className="resize-handle resize-handle-bottom" onMouseDown={onResizeBottom} />
                         <div className="resize-handle resize-handle-bottom-left" onMouseDown={onResizeBottomLeft} />
                     </>
                 )}
-                {/* Header — always visible */}
-                <WidgetHeader
-                    isRecording={isRecording}
-                    isExpanded={isExpanded}
-                    isCapturing={isCapturing}
-                    isGenerating={isGenerating}
-                    sessionTime={sessionTime}
-                    hasTranscript={conversation && conversation.length > 0}
-                    onToggleRecording={onToggleRecording}
-                    onToggleExpanded={onToggleExpanded}
-                    onCaptureScreen={onCaptureScreen}
-                    onRegionCapture={onRegionCapture}
-                    onGenerateAnswer={onGenerateAnswer}
-                    onToggleChat={onToggleChat}
-                    onToggleHistory={onToggleHistory}
-                    onTogglePractice={onTogglePractice}
-                    onDrag={handleDrag}
-                    onClose={onClose}
-                />
+                {/* Header — always visible (unless teleprompter) */}
+                {!isTeleprompterMode && (
+                    <WidgetHeader
+                        isRecording={isRecording}
+                        isExpanded={isExpanded}
+                        isCapturing={isCapturing}
+                        isGenerating={isGenerating}
+                        sessionTime={sessionTime}
+                        hasTranscript={conversation && conversation.length > 0}
+                        onToggleRecording={onToggleRecording}
+                        onToggleExpanded={onToggleExpanded}
+                        onCaptureScreen={onCaptureScreen}
+                        onRegionCapture={onRegionCapture}
+                        onGenerateAnswer={onGenerateAnswer}
+                        onToggleChat={onToggleChat}
+                        onToggleHistory={onToggleHistory}
+                        onTogglePractice={onTogglePractice}
+                        onDrag={handleDrag}
+                        onClose={onClose}
+                    />
+                )}
 
                 {/* Expandable content */}
                 <div className="widget-body">
-                    {isFullPagePanel ? (
+                    {isTeleprompterMode ? (
+                        <TeleprompterView candidateQuestions={candidateQuestions} />
+                    ) : isFullPagePanel ? (
                         <div className="flex flex-col flex-1 h-full w-full overflow-hidden">
                             {isChatOpen ? (
                                 <ChatPanel onClose={onToggleChat} />

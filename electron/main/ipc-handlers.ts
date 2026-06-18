@@ -278,6 +278,47 @@ export function registerIPCHandlers(): void {
             };
         }
     });
+
+    // TTS: Synthesize speech via Deepgram Aura
+    ipcMain.handle('tts:synthesize', async (event, text: string) => {
+        try {
+            const { getSettings } = await import('./settings');
+            const settings = getSettings();
+            if (!settings.deepgramApiKey) {
+                throw new Error('Deepgram API Key is missing. Please set it in Settings.');
+            }
+
+            // Using asteria as default if not configured
+            const model = settings.deepgramTtsModel || 'aura-asteria-en';
+            
+            const response = await fetch(`https://api.deepgram.com/v1/speak?model=${model}`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Token ${settings.deepgramApiKey}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ text })
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Deepgram TTS failed: ${response.status} ${response.statusText} - ${errorText}`);
+            }
+
+            const arrayBuffer = await response.arrayBuffer();
+            return {
+                success: true,
+                audio: Buffer.from(arrayBuffer)
+            };
+        } catch (error) {
+            console.error('IPC: TTS generation failed:', error);
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error',
+            };
+        }
+    });
+
     
     // Ollama: Test connection
     ipcMain.handle(IPC_CHANNELS.TEST_OLLAMA, async () => {
@@ -1010,5 +1051,10 @@ export function registerGlobalShortcuts(mainWindow: BrowserWindow): void {
     // Ctrl+Shift+A → Region capture
     globalShortcut.register('CommandOrControl+Shift+A', () => {
         mainWindow.webContents.send('shortcut:region-capture');
+    });
+
+    // Ctrl+Shift+T → Toggle teleprompter mode
+    globalShortcut.register('CommandOrControl+Shift+T', () => {
+        mainWindow.webContents.send('shortcut:toggle-teleprompter');
     });
 }

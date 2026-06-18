@@ -10,6 +10,7 @@ interface UIState {
     isCapturing: boolean;
     isCodeMode: boolean;
     useBulletPoints: boolean;
+    isTeleprompterMode: boolean;
 
     // Actions
     toggleExpanded: () => void;
@@ -25,6 +26,7 @@ interface UIState {
     setCapturing: (capturing: boolean) => void;
     toggleCodeMode: () => void;
     toggleBulletPoints: () => void;
+    toggleTeleprompterMode: () => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -37,6 +39,7 @@ export const useUIStore = create<UIState>((set) => ({
     isCapturing: false,
     isCodeMode: false,
     useBulletPoints: false,
+    isTeleprompterMode: false,
 
     // Actions
     toggleExpanded: () =>
@@ -112,4 +115,6 @@ export const useUIStore = create<UIState>((set) => ({
     toggleBulletPoints: () => set((state) => ({ useBulletPoints: !state.useBulletPoints })),
 
     toggleCodeMode: () => set((state) => ({ isCodeMode: !state.isCodeMode })),
+
+    toggleTeleprompterMode: () => set((state) => ({ isTeleprompterMode: !state.isTeleprompterMode })),
 }));
