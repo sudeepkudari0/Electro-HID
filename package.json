@@ -33,6 +33,7 @@
     "test:e2e:generate-audio": "powershell -ExecutionPolicy Bypass -File scripts/generate-test-audio.ps1",
     "test:whisper-gpu": "bun run scripts/test-whisper-gpu.ts",
     "test:whisper-benchmark": "bun run scripts/benchmark-whisper-pipeline.ts",
+    "bench:question-detection": "bun run scripts/benchmark-question-detection.ts",
     "test:whisper-stream": "bun run scripts/test-whisper-streaming.ts",
     "setup:whisper": "powershell -ExecutionPolicy Bypass -File scripts/setup-whisper.ps1"
   },
