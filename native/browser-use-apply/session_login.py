@@ -160,8 +160,8 @@ async def get_element_label(page, el):
         prev_text = await el.evaluate("""(element) => {
             let prev = element.previousSibling;
             while (prev) {
-                if (prev.nodeType === 3 && prev.nodeValue.strip()) {
-                    return prev.nodeValue.strip();
+                if (prev.nodeType === 3 && prev.nodeValue.trim()) {
+                    return prev.nodeValue.trim();
                 }
                 if (prev.nodeType === 1) {
                     let text = prev.innerText || prev.textContent;
@@ -533,8 +533,29 @@ async def _run_autofill_impl_inner(page, job_ctx, profile):
     resume_path = job_ctx.get("resumePath", "")
     cover_letter = job_ctx.get("coverLetterText", "")
     
-    # Simple YAML key extractor
+    # Simple YAML key extractor / Parser
     yaml_text = profile.get("masterResumeYaml", "")
+    parsed_yaml = None
+    if yaml_text:
+        try:
+            import yaml
+            parsed_yaml = yaml.safe_load(yaml_text)
+        except Exception:
+            pass
+
+    def find_in_dict(d, keys, default=None):
+        if not isinstance(d, dict):
+            return default
+        for k, v in d.items():
+            if k.lower() in keys:
+                if isinstance(v, (str, int, float)):
+                    return str(v).strip()
+            elif isinstance(v, dict):
+                res = find_in_dict(v, keys)
+                if res is not None:
+                    return res
+        return default
+
     def extract_from_yaml(key):
         if not yaml_text:
             return None
@@ -544,7 +565,33 @@ async def _run_autofill_impl_inner(page, job_ctx, profile):
             return match.group(1).strip().strip('"').strip("'")
         return None
 
-    # Try to extract keys
+    # Try to extract keys using YAML dict or fallback regex
+    fullName = profile.get("fullName")
+    email = profile.get("email")
+    phone = profile.get("phone")
+    location = profile.get("location")
+    linkedin = profile.get("linkedinUrl")
+    github = profile.get("githubUrl")
+    portfolio = profile.get("portfolioUrl")
+
+    if parsed_yaml:
+        fullName = fullName or find_in_dict(parsed_yaml, ["name", "fullname", "full_name"])
+        email = email or find_in_dict(parsed_yaml, ["email", "e-mail"])
+        phone = phone or find_in_dict(parsed_yaml, ["phone", "mobile", "cell", "telephone", "phone_number"])
+        location = location or find_in_dict(parsed_yaml, ["location", "address"])
+        linkedin = linkedin or find_in_dict(parsed_yaml, ["linkedin", "linkedinurl", "linkedin_url"])
+        github = github or find_in_dict(parsed_yaml, ["github", "githuburl", "github_url"])
+        portfolio = portfolio or find_in_dict(parsed_yaml, ["portfolio", "portfoliourl", "portfolio_url", "website", "personal_website"])
+
+    # Fallbacks via regex
+    fullName = fullName or extract_from_yaml("name") or extract_from_yaml("fullName") or ""
+    email = email or extract_from_yaml("email") or ""
+    phone = phone or extract_from_yaml("phone") or extract_from_yaml("mobile") or extract_from_yaml("cell") or ""
+    location = location or extract_from_yaml("location") or extract_from_yaml("address") or ""
+    linkedin = linkedin or extract_from_yaml("linkedin") or ""
+    github = github or extract_from_yaml("github") or ""
+    portfolio = portfolio or extract_from_yaml("portfolio") or extract_from_yaml("website") or ""
+
     gender = extract_from_yaml("gender") or extract_from_yaml("sex") or ""
     race = extract_from_yaml("race") or extract_from_yaml("ethnicity") or ""
     veteran = extract_from_yaml("veteran") or extract_from_yaml("veteranStatus") or ""
@@ -553,18 +600,18 @@ async def _run_autofill_impl_inner(page, job_ctx, profile):
     sponsorship = extract_from_yaml("sponsorshipNeeded") or extract_from_yaml("requireSponsorship") or ""
     
     candidate_summary = {
-        "fullName": profile.get("fullName", ""),
-        "email": profile.get("email", ""),
-        "phone": profile.get("phone", ""),
-        "location": profile.get("location", ""),
+        "fullName": fullName,
+        "email": email,
+        "phone": phone,
+        "location": location,
         "street_address": extract_from_yaml("address") or extract_from_yaml("street") or "",
         "city": extract_from_yaml("city") or "",
         "state": extract_from_yaml("state") or extract_from_yaml("province") or "",
         "postal_code": extract_from_yaml("zip") or extract_from_yaml("postalCode") or "",
         "country": extract_from_yaml("country") or "",
-        "linkedinUrl": profile.get("linkedinUrl", ""),
-        "githubUrl": profile.get("githubUrl", ""),
-        "portfolioUrl": profile.get("portfolioUrl", ""),
+        "linkedinUrl": linkedin,
+        "githubUrl": github,
+        "portfolioUrl": portfolio,
         "currentRole": extract_from_yaml("targetRole") or extract_from_yaml("currentRole") or "",
         "currentCompany": extract_from_yaml("currentCompany") or extract_from_yaml("targetCompany") or "",
         "totalYearsExperience": extract_from_yaml("totalYearsExperience") or extract_from_yaml("experienceYears") or "",
@@ -1515,10 +1562,27 @@ async def main():
             shadow.getElementById('llm-fields').innerText = '';
           };
           
+          function startObserver() {
+            if (!document.body) {
+              setTimeout(startObserver, 50);
+              return;
+            }
+            const observer = new MutationObserver(() => {
+              if (!document.getElementById('synapse-autofill-host')) {
+                inject();
+              }
+            });
+            observer.observe(document.body, { childList: true });
+          }
+
           if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', inject);
+            document.addEventListener('DOMContentLoaded', () => {
+              inject();
+              startObserver();
+            });
           } else {
             inject();
+            startObserver();
           }
           
           document.addEventListener('keydown', (e) => {

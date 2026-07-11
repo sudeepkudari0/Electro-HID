@@ -13,12 +13,16 @@ export function SettingsPanel({ onClose, onSettingsChanged }: SettingsPanelProps
     const [models, setModels] = useState<string[]>([]);
     const [geminiModels, setGeminiModels] = useState<string[]>([]);
     const [groqModels, setGroqModels] = useState<string[]>([]);
+    const [mistralModels, setMistralModels] = useState<string[]>([]);
     const [geminiVerified, setGeminiVerified] = useState(false);
     const [groqVerified, setGroqVerified] = useState(false);
+    const [mistralVerified, setMistralVerified] = useState(false);
     const [verifyingGemini, setVerifyingGemini] = useState(false);
     const [verifyingGroq, setVerifyingGroq] = useState(false);
+    const [verifyingMistral, setVerifyingMistral] = useState(false);
     const [geminiVerificationError, setGeminiVerificationError] = useState<string | null>(null);
     const [groqVerificationError, setGroqVerificationError] = useState<string | null>(null);
+    const [mistralVerificationError, setMistralVerificationError] = useState<string | null>(null);
 
     const [settings, setSettings] = useState({
         sttEngine: 'moonshine' as 'whisper' | 'moonshine' | 'deepgram',
@@ -30,8 +34,10 @@ export function SettingsPanel({ onClose, onSettingsChanged }: SettingsPanelProps
         deepgramModel: 'nova-3',
         geminiApiKey: '',
         groqApiKey: '',
+        mistralApiKey: '',
         geminiModel: 'gemini-2.0-flash',
         groqModel: 'llama-3.3-70b-versatile',
+        mistralModel: 'mistral-large-latest',
         useOllamaOnly: false,
         ollamaModel: 'qwen3-vl:2b',
         ollamaBaseUrl: 'http://localhost:11434/v1',
@@ -48,11 +54,11 @@ export function SettingsPanel({ onClose, onSettingsChanged }: SettingsPanelProps
         openaiModel: 'gpt-4o-mini',
         resumeContext: '',
         headlessApply: false,
-        interviewLlmProvider: 'ollama' as 'ollama' | 'openai' | 'gemini' | 'groq',
+        interviewLlmProvider: 'ollama' as 'ollama' | 'openai' | 'gemini' | 'groq' | 'mistral',
         interviewModel: 'qwen3-vl:2b',
-        tailorLlmProvider: 'gemini' as 'ollama' | 'openai' | 'gemini' | 'groq',
+        tailorLlmProvider: 'gemini' as 'ollama' | 'openai' | 'gemini' | 'groq' | 'mistral',
         tailorModel: 'gemini-2.0-flash',
-        applyLlmProvider: 'openai' as 'ollama' | 'openai' | 'gemini' | 'groq',
+        applyLlmProvider: 'openai' as 'ollama' | 'openai' | 'gemini' | 'groq' | 'mistral',
         applyModel: 'gpt-4o-mini'
     });
     const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
@@ -98,19 +104,23 @@ export function SettingsPanel({ onClose, onSettingsChanged }: SettingsPanelProps
         window.electronAPI.checkSttServer(settings.sttEngine).then(res => setServerStatus(res));
     }, [settings.sttEngine]);
 
-    const handleApiKeyChange = (provider: 'gemini' | 'groq', val: string) => {
+    const handleApiKeyChange = (provider: 'gemini' | 'groq' | 'mistral', val: string) => {
         if (provider === 'gemini') {
             setSettings(prev => ({ ...prev, geminiApiKey: val }));
             setGeminiVerified(false);
             setGeminiVerificationError(null);
-        } else {
+        } else if (provider === 'groq') {
             setSettings(prev => ({ ...prev, groqApiKey: val }));
             setGroqVerified(false);
             setGroqVerificationError(null);
+        } else {
+            setSettings(prev => ({ ...prev, mistralApiKey: val }));
+            setMistralVerified(false);
+            setMistralVerificationError(null);
         }
     };
 
-    const handleVerifyKey = async (provider: 'gemini' | 'groq') => {
+    const handleVerifyKey = async (provider: 'gemini' | 'groq' | 'mistral') => {
         // Save current input value of api keys immediately so electron service uses them
         try {
             await window.electronAPI.updateSettings(settings);
@@ -118,17 +128,25 @@ export function SettingsPanel({ onClose, onSettingsChanged }: SettingsPanelProps
         } catch (err) {
             console.error("Failed to update settings prior to key verification:", err);
         }
-        await fetchCloudModels(provider, provider === 'gemini' ? settings.geminiApiKey : settings.groqApiKey, true);
+        await fetchCloudModels(
+            provider, 
+            provider === 'gemini' ? settings.geminiApiKey : 
+            provider === 'groq' ? settings.groqApiKey : settings.mistralApiKey, 
+            true
+        );
     };
 
-    const fetchCloudModels = async (provider: 'gemini' | 'groq', apiKey: string, showFeedback = false) => {
+    const fetchCloudModels = async (provider: 'gemini' | 'groq' | 'mistral', apiKey: string, showFeedback = false) => {
         if (!apiKey) {
             if (provider === 'gemini') {
                 setGeminiVerified(false);
                 setGeminiModels([]);
-            } else {
+            } else if (provider === 'groq') {
                 setGroqVerified(false);
                 setGroqModels([]);
+            } else {
+                setMistralVerified(false);
+                setMistralModels([]);
             }
             return;
         }
@@ -136,9 +154,12 @@ export function SettingsPanel({ onClose, onSettingsChanged }: SettingsPanelProps
         if (provider === 'gemini') {
             setVerifyingGemini(true);
             if (showFeedback) setGeminiVerificationError(null);
-        } else {
+        } else if (provider === 'groq') {
             setVerifyingGroq(true);
             if (showFeedback) setGroqVerificationError(null);
+        } else {
+            setVerifyingMistral(true);
+            if (showFeedback) setMistralVerificationError(null);
         }
 
         try {
@@ -147,9 +168,12 @@ export function SettingsPanel({ onClose, onSettingsChanged }: SettingsPanelProps
                 if (provider === 'gemini') {
                     setGeminiModels(res.models);
                     setGeminiVerified(true);
-                } else {
+                } else if (provider === 'groq') {
                     setGroqModels(res.models);
                     setGroqVerified(true);
+                } else {
+                    setMistralModels(res.models);
+                    setMistralVerified(true);
                 }
             } else {
                 throw new Error(res.error || `Failed to verify key with ${provider} API`);
@@ -161,22 +185,29 @@ export function SettingsPanel({ onClose, onSettingsChanged }: SettingsPanelProps
                 if (showFeedback) {
                     setGeminiVerificationError(err.message || String(err));
                 }
-            } else {
+            } else if (provider === 'groq') {
                 setGroqVerified(false);
                 if (showFeedback) {
                     setGroqVerificationError(err.message || String(err));
+                }
+            } else {
+                setMistralVerified(false);
+                if (showFeedback) {
+                    setMistralVerificationError(err.message || String(err));
                 }
             }
         } finally {
             if (provider === 'gemini') {
                 setVerifyingGemini(false);
-            } else {
+            } else if (provider === 'groq') {
                 setVerifyingGroq(false);
+            } else {
+                setVerifyingMistral(false);
             }
         }
     };
 
-    const handleInterviewProviderChange = (provider: 'ollama' | 'openai' | 'gemini' | 'groq') => {
+    const handleInterviewProviderChange = (provider: 'ollama' | 'openai' | 'gemini' | 'groq' | 'mistral') => {
         let defaultModel = 'gpt-4o-mini';
         if (provider === 'ollama') {
             defaultModel = 'qwen3-vl:2b';
@@ -184,6 +215,8 @@ export function SettingsPanel({ onClose, onSettingsChanged }: SettingsPanelProps
             defaultModel = geminiModels.length > 0 ? geminiModels[0] : 'gemini-2.0-flash';
         } else if (provider === 'groq') {
             defaultModel = groqModels.length > 0 ? groqModels[0] : 'llama-3.3-70b-versatile';
+        } else if (provider === 'mistral') {
+            defaultModel = mistralModels.length > 0 ? mistralModels[0] : 'mistral-large-latest';
         }
         setSettings(prev => ({
             ...prev,
@@ -192,7 +225,7 @@ export function SettingsPanel({ onClose, onSettingsChanged }: SettingsPanelProps
         }));
     };
 
-    const handleTailorProviderChange = (provider: 'ollama' | 'openai' | 'gemini' | 'groq') => {
+    const handleTailorProviderChange = (provider: 'ollama' | 'openai' | 'gemini' | 'groq' | 'mistral') => {
         let defaultModel = 'gpt-4o-mini';
         if (provider === 'ollama') {
             defaultModel = 'qwen2.5-coder:7b';
@@ -200,6 +233,8 @@ export function SettingsPanel({ onClose, onSettingsChanged }: SettingsPanelProps
             defaultModel = geminiModels.length > 0 ? geminiModels[0] : 'gemini-2.0-flash';
         } else if (provider === 'groq') {
             defaultModel = groqModels.length > 0 ? groqModels[0] : 'llama-3.3-70b-versatile';
+        } else if (provider === 'mistral') {
+            defaultModel = mistralModels.length > 0 ? mistralModels[0] : 'mistral-large-latest';
         }
         setSettings(prev => ({
             ...prev,
@@ -208,7 +243,7 @@ export function SettingsPanel({ onClose, onSettingsChanged }: SettingsPanelProps
         }));
     };
 
-    const handleApplyProviderChange = (provider: 'ollama' | 'openai' | 'gemini' | 'groq') => {
+    const handleApplyProviderChange = (provider: 'ollama' | 'openai' | 'gemini' | 'groq' | 'mistral') => {
         let defaultModel = 'gpt-4o-mini';
         if (provider === 'ollama') {
             defaultModel = 'qwen3-vl:2b';
@@ -216,6 +251,8 @@ export function SettingsPanel({ onClose, onSettingsChanged }: SettingsPanelProps
             defaultModel = geminiModels.length > 0 ? geminiModels[0] : 'gemini-2.0-flash';
         } else if (provider === 'groq') {
             defaultModel = groqModels.length > 0 ? groqModels[0] : 'llama-3.3-70b-versatile';
+        } else if (provider === 'mistral') {
+            defaultModel = mistralModels.length > 0 ? mistralModels[0] : 'mistral-large-latest';
         }
         setSettings(prev => ({
             ...prev,
@@ -244,8 +281,10 @@ export function SettingsPanel({ onClose, onSettingsChanged }: SettingsPanelProps
                     deepgramModel: s.deepgramModel || 'nova-3',
                     geminiApiKey: s.geminiApiKey || '',
                     groqApiKey: s.groqApiKey || '',
+                    mistralApiKey: s.mistralApiKey || '',
                     geminiModel: s.geminiModel || 'gemini-2.0-flash',
                     groqModel: s.groqModel || 'llama-3.3-70b-versatile',
+                    mistralModel: s.mistralModel || 'mistral-large-latest',
                     useOllamaOnly: s.useOllamaOnly || false,
                     ollamaModel: s.ollamaModel || 'qwen3-vl:2b',
                     ollamaBaseUrl: s.ollamaBaseUrl || 'http://localhost:11434/v1',
@@ -273,6 +312,7 @@ export function SettingsPanel({ onClose, onSettingsChanged }: SettingsPanelProps
                 // Fetch cloud models silently with loaded keys
                 fetchCloudModels('gemini', s.geminiApiKey, false);
                 fetchCloudModels('groq', s.groqApiKey, false);
+                fetchCloudModels('mistral', s.mistralApiKey, false);
             }
             // Mark initial load complete after state is set
             setTimeout(() => { isInitialLoadRef.current = false; }, 100);
@@ -753,6 +793,7 @@ export function SettingsPanel({ onClose, onSettingsChanged }: SettingsPanelProps
                                             <option value="ollama">Local (Ollama)</option>
                                             <option value="gemini">Google Gemini</option>
                                             <option value="groq">Groq Cloud</option>
+                                            <option value="mistral">Mistral AI</option>
                                             <option value="openai">OpenAI-Compatible</option>
                                         </select>
                                     </div>
@@ -805,6 +846,22 @@ export function SettingsPanel({ onClose, onSettingsChanged }: SettingsPanelProps
                                                     </>
                                                 )}
                                             </select>
+                                        ) : settings.interviewLlmProvider === 'mistral' ? (
+                                            <select
+                                                value={settings.interviewModel}
+                                                onChange={(e) => setSettings({ ...settings, interviewModel: e.target.value })}
+                                                className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                            >
+                                                {mistralModels.length > 0 ? (
+                                                    mistralModels.map(m => <option key={m} value={m}>{m}</option>)
+                                                ) : (
+                                                    <>
+                                                        <option value="mistral-large-latest">mistral-large-latest</option>
+                                                        <option value="mistral-medium-latest">mistral-medium-latest</option>
+                                                        <option value="mistral-small-latest">mistral-small-latest</option>
+                                                    </>
+                                                )}
+                                            </select>
                                         ) : (
                                             <input
                                                 type="text"
@@ -835,6 +892,7 @@ export function SettingsPanel({ onClose, onSettingsChanged }: SettingsPanelProps
                                             <option value="ollama">Local (Ollama)</option>
                                             <option value="gemini">Google Gemini</option>
                                             <option value="groq">Groq Cloud</option>
+                                            <option value="mistral">Mistral AI</option>
                                             <option value="openai">OpenAI-Compatible</option>
                                         </select>
                                     </div>
@@ -885,6 +943,22 @@ export function SettingsPanel({ onClose, onSettingsChanged }: SettingsPanelProps
                                                     </>
                                                 )}
                                             </select>
+                                        ) : settings.tailorLlmProvider === 'mistral' ? (
+                                            <select
+                                                value={settings.tailorModel}
+                                                onChange={(e) => setSettings({ ...settings, tailorModel: e.target.value })}
+                                                className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                            >
+                                                {mistralModels.length > 0 ? (
+                                                    mistralModels.map(m => <option key={m} value={m}>{m}</option>)
+                                                ) : (
+                                                    <>
+                                                        <option value="mistral-large-latest">mistral-large-latest</option>
+                                                        <option value="mistral-medium-latest">mistral-medium-latest</option>
+                                                        <option value="mistral-small-latest">mistral-small-latest</option>
+                                                    </>
+                                                )}
+                                            </select>
                                         ) : (
                                             <input
                                                 type="text"
@@ -915,6 +989,7 @@ export function SettingsPanel({ onClose, onSettingsChanged }: SettingsPanelProps
                                             <option value="ollama">Local (Ollama)</option>
                                             <option value="gemini">Google Gemini</option>
                                             <option value="groq">Groq Cloud</option>
+                                            <option value="mistral">Mistral AI</option>
                                             <option value="openai">OpenAI-Compatible</option>
                                         </select>
                                     </div>
@@ -962,6 +1037,22 @@ export function SettingsPanel({ onClose, onSettingsChanged }: SettingsPanelProps
                                                         <option value="llama-3.3-70b-versatile">llama-3.3-70b-versatile</option>
                                                         <option value="llama-3.1-8b-instant">llama-3.1-8b-instant</option>
                                                         <option value="mixtral-8x7b-32768">mixtral-8x7b-32768</option>
+                                                    </>
+                                                )}
+                                            </select>
+                                        ) : settings.applyLlmProvider === 'mistral' ? (
+                                            <select
+                                                value={settings.applyModel}
+                                                onChange={(e) => setSettings({ ...settings, applyModel: e.target.value })}
+                                                className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                            >
+                                                {mistralModels.length > 0 ? (
+                                                    mistralModels.map(m => <option key={m} value={m}>{m}</option>)
+                                                ) : (
+                                                    <>
+                                                        <option value="mistral-large-latest">mistral-large-latest</option>
+                                                        <option value="mistral-medium-latest">mistral-medium-latest</option>
+                                                        <option value="mistral-small-latest">mistral-small-latest</option>
                                                     </>
                                                 )}
                                             </select>
@@ -1065,6 +1156,46 @@ export function SettingsPanel({ onClose, onSettingsChanged }: SettingsPanelProps
                                 {groqVerificationError && (
                                     <p className="text-[10px] text-red-400 bg-red-500/5 px-2.5 py-1 rounded border border-red-500/10 animate-slide-down">
                                         Verification failed: {groqVerificationError}
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Mistral AI API Key */}
+                            <div className="bg-zinc-950/40 p-4 rounded-xl border border-zinc-800 space-y-3">
+                                <label className="block text-xs font-semibold text-zinc-300 flex items-center justify-between">
+                                    <span>Mistral AI API Key</span>
+                                    {mistralVerified && (
+                                        <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 font-medium font-mono">
+                                            ✓ Connected
+                                        </span>
+                                    )}
+                                </label>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="password"
+                                        value={settings.mistralApiKey}
+                                        onChange={(e) => handleApiKeyChange('mistral', e.target.value)}
+                                        placeholder="Mistral API Key..."
+                                        className="flex-1 bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all duration-200"
+                                    />
+                                    {settings.mistralApiKey && (
+                                        <button
+                                            type="button"
+                                            onClick={() => handleVerifyKey('mistral')}
+                                            disabled={verifyingMistral}
+                                            className={`px-3 py-2 rounded-lg text-[10px] font-semibold border transition-all duration-200 flex items-center justify-center min-w-[70px] ${
+                                                mistralVerified
+                                                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20'
+                                                    : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed'
+                                            }`}
+                                        >
+                                            {verifyingMistral ? 'Verifying...' : mistralVerified ? 'Verified' : 'Verify'}
+                                        </button>
+                                    )}
+                                </div>
+                                {mistralVerificationError && (
+                                    <p className="text-[10px] text-red-400 bg-red-500/5 px-2.5 py-1 rounded border border-red-500/10 animate-slide-down">
+                                        Verification failed: {mistralVerificationError}
                                     </p>
                                 )}
                             </div>

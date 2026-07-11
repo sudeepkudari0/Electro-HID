@@ -46,8 +46,9 @@ export function CareerHub() {
           setMasterResumeYaml(res.profile.masterResumeYaml);
           setMasterResumeText(res.profile.masterResumeText || "");
           const { load } = await import("js-yaml");
-          const parsed = load(res.profile.masterResumeYaml) as MasterResume;
-          setMasterResume(parsed);
+          const { normalizeResume } = await import("../../career/core/resumeParser");
+          const parsed = load(res.profile.masterResumeYaml) as any;
+          setMasterResume(normalizeResume(parsed));
           setProfile(res.profile);
         }
       } catch (err) {

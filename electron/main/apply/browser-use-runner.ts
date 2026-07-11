@@ -29,6 +29,12 @@ function buildLlmConfig(): { model: string; apiKey: string; baseUrl?: string } {
       apiKey: settings.groqApiKey || "",
       baseUrl: "https://api.groq.com/openai/v1"
     };
+  } else if (applyProvider === 'mistral') {
+    llmConfig = {
+      model: settings.applyModel || settings.mistralModel || "mistral-large-latest",
+      apiKey: settings.mistralApiKey || "",
+      baseUrl: "https://api.mistral.ai/v1"
+    };
   } else if (applyProvider === 'ollama') {
     llmConfig = {
       model: settings.applyModel || settings.ollamaModel || "qwen3-vl:2b",
@@ -336,9 +342,10 @@ export function runLogin(
       const profileDir = path.join(userProfileBaseDir, site === "linkedin" ? "linkedin" : "apply-default");
       fs.mkdirSync(profileDir, { recursive: true });
 
-      // Load profile and LLM config for the manual session
-      const { loadProfile } = require("../storage/profile-store");
-      const profile = loadProfile();
+      // Load career profile and LLM config for the manual session
+      const { JSONStore } = require("../storage/store");
+      const store = new JSONStore("career-hub");
+      const profile = store.read("career-profile.json") || {};
       const llmConfig = buildLlmConfig();
 
       // Write temp payload file

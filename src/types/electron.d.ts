@@ -109,7 +109,7 @@ interface ElectronAPI {
     error?: string;
   }>;
   llmGetAvailableModels: (
-    provider: "gemini" | "groq",
+    provider: "gemini" | "groq" | "mistral",
   ) => Promise<{ success: boolean; models?: string[]; error?: string }>;
 
   // TTS API

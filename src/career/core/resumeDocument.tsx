@@ -132,12 +132,12 @@ export default function ResumeDocument({ resume }: ResumeDocumentProps) {
             {exp.intern_bullets && exp.intern_bullets.length > 0 ? (
               <>
                 <Text style={s.subsectionHeader}>{"\u2013"}{"   "}As Full-Time Developer ({exp.dates}):</Text>
-                {exp.bullets.map((b, j) => <Bullet key={j} text={b} indented />)}
+                {(exp.bullets || []).map((b, j) => <Bullet key={j} text={b} indented />)}
                 <Text style={s.subsectionHeader}>{"\u2013"}{"   "}As Intern:</Text>
                 {exp.intern_bullets.map((b, j) => <Bullet key={j} text={b} indented />)}
               </>
             ) : (
-              exp.bullets.map((b, j) => <Bullet key={j} text={b} />)
+              (exp.bullets || []).map((b, j) => <Bullet key={j} text={b} />)
             )}
           </View>
         ))}

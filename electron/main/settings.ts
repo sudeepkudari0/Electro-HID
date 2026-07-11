@@ -13,8 +13,10 @@ export interface AppSettings {
     deepgramTtsModel: string;
     geminiApiKey: string;
     groqApiKey: string;
+    mistralApiKey: string;
     geminiModel: string;
     groqModel: string;
+    mistralModel: string;
     useOllamaOnly: boolean;
     ollamaModel: string;
     ollamaBaseUrl: string;
@@ -32,16 +34,16 @@ export interface AppSettings {
     openaiModel: string;
     resumeContext: string;
     headlessApply: boolean;
-    interviewLlmProvider: 'ollama' | 'openai' | 'gemini' | 'groq';
+    interviewLlmProvider: 'ollama' | 'openai' | 'gemini' | 'groq' | 'mistral';
     interviewModel: string;
-    tailorLlmProvider: 'ollama' | 'openai' | 'gemini' | 'groq';
+    tailorLlmProvider: 'ollama' | 'openai' | 'gemini' | 'groq' | 'mistral';
     tailorModel: string;
-    applyLlmProvider: 'ollama' | 'openai' | 'gemini' | 'groq';
+    applyLlmProvider: 'ollama' | 'openai' | 'gemini' | 'groq' | 'mistral';
     applyModel: string;
     autoAnswerConfidenceThreshold: number; // 0-1, questions above this confidence auto-generate answers
 }
 
-const CURRENT_VERSION = 19;
+const CURRENT_VERSION = 20;
 
 const DEFAULT_SETTINGS: AppSettings = {
     version: CURRENT_VERSION,
@@ -54,8 +56,10 @@ const DEFAULT_SETTINGS: AppSettings = {
     deepgramTtsModel: 'aura-asteria-en',
     geminiApiKey: '',
     groqApiKey: '',
+    mistralApiKey: '',
     geminiModel: 'gemini-2.0-flash',
     groqModel: 'llama-3.3-70b-versatile',
+    mistralModel: 'mistral-large-latest',
     useOllamaOnly: false,
     ollamaModel: 'qwen3-vl:2b',
     ollamaBaseUrl: 'http://localhost:11434/v1',
@@ -246,6 +250,18 @@ const MIGRATIONS: Record<number, (settings: any) => any> = {
             ...settings,
             deepgramTtsModel: 'aura-asteria-en',
             version: 19,
+        };
+    },
+    19: (settings: any) => {
+        // v19 -> v20: Add Mistral AI support
+        return {
+            ...settings,
+            mistralApiKey: '',
+            mistralModel: 'mistral-large-latest',
+            interviewLlmProvider: settings.interviewLlmProvider || 'ollama',
+            tailorLlmProvider: settings.tailorLlmProvider || 'gemini',
+            applyLlmProvider: settings.applyLlmProvider || 'openai',
+            version: 20,
         };
     },
 };

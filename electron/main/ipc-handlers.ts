@@ -368,8 +368,8 @@ export function registerIPCHandlers(): void {
         }
     });
 
-    // Fetch available Gemini & Groq models
-    ipcMain.handle('llm:get-available-models', async (event, provider: 'gemini' | 'groq') => {
+    // Fetch available Gemini, Groq & Mistral models
+    ipcMain.handle('llm:get-available-models', async (event, provider: 'gemini' | 'groq' | 'mistral') => {
         try {
             const { getLLMService } = await import('./llm/llm-service');
             const llmService = getLLMService();

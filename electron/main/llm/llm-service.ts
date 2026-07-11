@@ -22,8 +22,10 @@ export interface LLMOptions {
 interface LLMConfig {
     geminiApiKey: string;
     groqApiKey: string;
+    mistralApiKey: string;
     geminiModel: string;
     groqModel: string;
+    mistralModel: string;
     ollamaModel: string;
     ollamaBaseUrl: string;
     useOllamaOnly: boolean;
@@ -50,6 +52,7 @@ export class LLMService {
     private groqClient: OpenAI;
     private ollamaClient: OpenAI;
     private openaiClient: OpenAI;
+    private mistralClient: OpenAI;
 
     // Default models
     private static readonly DEFAULT_MODELS = {
@@ -57,6 +60,7 @@ export class LLMService {
         groq: 'llama-3.3-70b-versatile', // Highly accurate model
         ollama: 'qwen3-vl:2b', // Default local model
         openai: 'gpt-4o-mini',
+        mistral: 'mistral-large-latest',
     };
 
     constructor(config?: Partial<LLMConfig>) {
@@ -70,19 +74,23 @@ export class LLMService {
         };
         const geminiApiKey = cleanKey(settings.geminiApiKey || process.env.GEMINI_API_KEY);
         const groqApiKey = cleanKey(settings.groqApiKey || process.env.GROQ_API_KEY);
+        const mistralApiKey = cleanKey(settings.mistralApiKey || process.env.MISTRAL_API_KEY);
 
         console.log("gemini api key available:", !!geminiApiKey);
         console.log("groq api key available:", !!groqApiKey);
+        console.log("mistral api key available:", !!mistralApiKey);
 
-        if (!geminiApiKey && !groqApiKey) {
+        if (!geminiApiKey && !groqApiKey && !mistralApiKey) {
             console.warn(`[LLMService] Warning: No API keys configured in settings. Go to settings to add them.`);
         }
 
         this.config = {
             geminiApiKey: geminiApiKey || '',
             groqApiKey: groqApiKey || '',
+            mistralApiKey: mistralApiKey || '',
             geminiModel: settings.geminiModel || process.env.GEMINI_MODEL || LLMService.DEFAULT_MODELS.gemini,
             groqModel: settings.groqModel || process.env.GROQ_MODEL || LLMService.DEFAULT_MODELS.groq,
+            mistralModel: settings.mistralModel || process.env.MISTRAL_MODEL || LLMService.DEFAULT_MODELS.mistral,
             ollamaModel: settings.ollamaModel || process.env.OLLAMA_MODEL || LLMService.DEFAULT_MODELS.ollama,
             ollamaBaseUrl: settings.ollamaBaseUrl || process.env.OLLAMA_BASE_URL || 'http://localhost:11434/v1',
             useOllamaOnly: settings.useOllamaOnly ?? false,
@@ -123,6 +131,16 @@ export class LLMService {
             this.openaiClient = null as any;
         }
 
+        // Initialize Mistral (via OpenAI SDK pointing to Mistral API)
+        if (this.config.mistralApiKey) {
+            this.mistralClient = new OpenAI({
+                apiKey: this.config.mistralApiKey,
+                baseURL: 'https://api.mistral.ai/v1',
+            });
+        } else {
+            this.mistralClient = null as any;
+        }
+
         // Initialize Ollama (via OpenAI SDK pointing to local instance)
         this.ollamaClient = new OpenAI({
             apiKey: 'ollama', // Dummy key required by SDK
@@ -156,7 +174,7 @@ export class LLMService {
      */
     private resolveProviderAndModel(task?: 'interview' | 'tailor' | 'apply') {
         const settings = getSettings();
-        let provider: 'ollama' | 'openai' | 'gemini' | 'groq';
+        let provider: 'ollama' | 'openai' | 'gemini' | 'groq' | 'mistral';
         let model: string;
 
         const activeTask = task || 'interview';
@@ -176,6 +194,7 @@ export class LLMService {
         if (!model) {
             model = provider === 'gemini' ? settings.geminiModel :
                     provider === 'groq' ? settings.groqModel :
+                    provider === 'mistral' ? settings.mistralModel :
                     provider === 'openai' ? settings.openaiModel : settings.ollamaModel;
         }
         if (!model) {
@@ -209,6 +228,11 @@ export class LLMService {
                     return await this.generateGroq(taskOptions);
                 }
                 throw new Error("Groq API key is not configured.");
+            } else if (provider === 'mistral') {
+                if (this.mistralClient) {
+                    return await this.generateMistral(taskOptions);
+                }
+                throw new Error("Mistral AI API key is not configured.");
             }
         } catch (error) {
             console.error(`[LLMService] Requested provider ${provider} failed, falling back to cascade...`, error);
@@ -241,7 +265,17 @@ export class LLMService {
                 console.log('[LLMService] Trying Groq...');
                 return await this.generateGroq(options);
             } catch (error) {
-                console.error('[LLMService] Groq failed:', error, '- Falling back to Ollama...');
+                console.error('[LLMService] Groq failed:', error, '- Falling back...');
+            }
+        }
+
+        // Try Mistral if key exists
+        if (this.mistralClient) {
+            try {
+                console.log('[LLMService] Trying Mistral...');
+                return await this.generateMistral(options);
+            } catch (error) {
+                console.error('[LLMService] Mistral failed:', error, '- Falling back to Ollama...');
             }
         }
 
@@ -283,6 +317,12 @@ export class LLMService {
                     return;
                 }
                 throw new Error("Groq API key is not configured.");
+            } else if (provider === 'mistral') {
+                if (this.mistralClient) {
+                    yield* this.streamMistral(taskOptions);
+                    return;
+                }
+                throw new Error("Mistral AI API key is not configured.");
             }
         } catch (error) {
             console.error(`[LLMService] Requested streaming provider ${provider} failed, falling back to cascade...`, error);
@@ -341,7 +381,29 @@ export class LLMService {
                     return; // Stream succeeded, exit generator
                 }
             } catch (error) {
-                console.error('[LLMService] Groq Stream failed:', error, '- Falling back to Ollama...');
+                console.error('[LLMService] Groq Stream failed:', error, '- Falling back...');
+            }
+        }
+
+        // 3. Try Mistral Stream next if key exists
+        if (this.mistralClient) {
+            try {
+                console.log('[LLMService] Trying Mistral (Stream)...');
+                const stream = this.streamMistral(options);
+                const iterator = stream[Symbol.asyncIterator]();
+                let firstResult = await iterator.next();
+
+                if (!firstResult.done) {
+                    yield firstResult.value;
+                    while (true) {
+                        const result = await iterator.next();
+                        if (result.done) break;
+                        yield result.value;
+                    }
+                    return; // Stream succeeded, exit generator
+                }
+            } catch (error) {
+                console.error('[LLMService] Mistral Stream failed:', error, '- Falling back to Ollama...');
             }
         }
 
@@ -635,10 +697,10 @@ export class LLMService {
     }
 
     /**
-     * Fetch available models for Gemini or Groq from their APIs.
+     * Fetch available models for Gemini, Groq, or Mistral from their APIs.
      * Falls back to a curated list if API keys are missing or requests fail.
      */
-    async listModels(provider: 'gemini' | 'groq'): Promise<string[]> {
+    async listModels(provider: 'gemini' | 'groq' | 'mistral'): Promise<string[]> {
         if (provider === 'gemini') {
             const fallbackModels = [
                 'gemini-2.5-flash',
@@ -664,7 +726,7 @@ export class LLMService {
                 console.error('[LLMService] Failed to fetch Gemini models from API, using fallback list:', error);
                 return fallbackModels;
             }
-        } else {
+        } else if (provider === 'groq') {
             const fallbackModels = [
                 'llama-3.3-70b-versatile',
                 'llama-3.1-8b-instant',
@@ -685,6 +747,30 @@ export class LLMService {
                 return fallbackModels;
             } catch (error) {
                 console.error('[LLMService] Failed to fetch Groq models from API, using fallback list:', error);
+                return fallbackModels;
+            }
+        } else {
+            const fallbackModels = [
+                'mistral-large-latest',
+                'mistral-medium-latest',
+                'mistral-small-latest',
+                'open-mixtral-8x22b',
+                'open-mixtral-8x7b',
+                'codestral-latest'
+            ];
+            if (!this.config.mistralApiKey) {
+                return fallbackModels;
+            }
+            try {
+                if (this.mistralClient && this.mistralClient.models && typeof this.mistralClient.models.list === 'function') {
+                    const response = await this.mistralClient.models.list();
+                    if (response && Array.isArray(response.data)) {
+                        return response.data.map((m: any) => m.id);
+                    }
+                }
+                return fallbackModels;
+            } catch (error) {
+                console.error('[LLMService] Failed to fetch Mistral models from API, using fallback list:', error);
                 return fallbackModels;
             }
         }
@@ -768,6 +854,84 @@ export class LLMService {
 
         const stream = await this.openaiClient.chat.completions.create({
             model: options.modelOverride || this.config.openaiModel || 'gpt-4o-mini',
+            messages,
+            temperature: options.temperature ?? 0.7,
+            max_tokens: options.maxTokens,
+            stream: true,
+        });
+
+        for await (const chunk of stream) {
+            const content = chunk.choices[0]?.delta?.content;
+            if (content) {
+                yield content;
+            }
+        }
+    }
+
+    // ─── Mistral Implementation ───
+
+    private async generateMistral(options: LLMOptions): Promise<string> {
+        if (!this.mistralClient) {
+            throw new Error("Mistral AI API key is not configured. Please add it in Settings.");
+        }
+        const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+            { role: 'system', content: options.systemPrompt },
+        ];
+
+        if (options.imageData) {
+            messages.push({
+                role: 'user',
+                content: [
+                    { type: 'text', text: options.prompt },
+                    {
+                        type: 'image_url',
+                        image_url: {
+                            url: `data:image/png;base64,${options.imageData}`,
+                        },
+                    },
+                ],
+            });
+        } else {
+            messages.push({ role: 'user', content: options.prompt });
+        }
+
+        const response = await this.mistralClient.chat.completions.create({
+            model: options.modelOverride || this.config.mistralModel || 'mistral-large-latest',
+            messages,
+            temperature: options.temperature ?? 0.7,
+            max_tokens: options.maxTokens,
+        });
+
+        return response.choices[0]?.message?.content || '';
+    }
+
+    private async *streamMistral(options: LLMOptions): AsyncIterable<string> {
+        if (!this.mistralClient) {
+            throw new Error("Mistral AI API key is not configured. Please add it in Settings.");
+        }
+        const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+            { role: 'system', content: options.systemPrompt },
+        ];
+
+        if (options.imageData) {
+            messages.push({
+                role: 'user',
+                content: [
+                    { type: 'text', text: options.prompt },
+                    {
+                        type: 'image_url',
+                        image_url: {
+                            url: `data:image/png;base64,${options.imageData}`,
+                        },
+                    },
+                ],
+            });
+        } else {
+            messages.push({ role: 'user', content: options.prompt });
+        }
+
+        const stream = await this.mistralClient.chat.completions.create({
+            model: options.modelOverride || this.config.mistralModel || 'mistral-large-latest',
             messages,
             temperature: options.temperature ?? 0.7,
             max_tokens: options.maxTokens,

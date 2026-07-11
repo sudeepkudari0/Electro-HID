@@ -6,6 +6,7 @@
 
 import type { LLMProvider, MasterResume, JDAnalysis } from './types';
 import { PROMPTS } from './prompts';
+import { normalizeResume } from './resumeParser';
 
 export class ResumeEditor {
   constructor(private llm: LLMProvider) {}
@@ -13,7 +14,8 @@ export class ResumeEditor {
   /**
    * Convert master resume to plain text for LLM
    */
-  masterResumeToText(resume: MasterResume): string {
+  masterResumeToText(rawResume: MasterResume): string {
+    const resume = normalizeResume(rawResume);
     const lines: string[] = [
       `# ${resume.name}`,
       `Email: ${resume.email}`,

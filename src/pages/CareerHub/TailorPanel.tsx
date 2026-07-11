@@ -93,20 +93,21 @@ export function TailorPanel() {
       setMasterResumeYaml(text);
       try {
         const { load } = await import("js-yaml");
+        const { normalizeResume } = await import("../../career/core/resumeParser");
         const parsed = load(text) as any;
-        setMasterResume(parsed);
+        setMasterResume(normalizeResume(parsed));
 
         // Extract and structure profile info from the resume YAML for the auto-apply runner
         const profileData = {
-          fullName: parsed.name || parsed.personal?.name || "",
-          email: parsed.email || parsed.personal?.email || "",
-          phone: parsed.phone || parsed.personal?.phone || "",
-          location: parsed.location || parsed.personal?.location || "",
-          linkedinUrl: parsed.linkedin || parsed.personal?.linkedin || parsed.linkedinUrl || "",
-          githubUrl: parsed.github || parsed.personal?.github || parsed.githubUrl || "",
-          portfolioUrl: parsed.portfolio || parsed.personal?.portfolio || parsed.portfolioUrl || "",
+          fullName: parsed.name || parsed.personal?.name || parsed.person?.name || parsed.personal_info?.name || "",
+          email: parsed.email || parsed.personal?.email || parsed.person?.email || parsed.personal_info?.email || "",
+          phone: parsed.phone || parsed.personal?.phone || parsed.person?.phone || parsed.personal_info?.phone || "",
+          location: parsed.location || parsed.personal?.location || parsed.person?.location || parsed.personal_info?.location || "",
+          linkedinUrl: parsed.linkedin || parsed.personal?.linkedin || parsed.person?.linkedin || parsed.links?.linkedin || parsed.linkedinUrl || parsed.personal?.linkedinUrl || parsed.person?.linkedinUrl || "",
+          githubUrl: parsed.github || parsed.personal?.github || parsed.person?.github || parsed.links?.github || parsed.githubUrl || parsed.personal?.githubUrl || parsed.person?.githubUrl || "",
+          portfolioUrl: parsed.portfolio || parsed.personal?.portfolio || parsed.person?.portfolio || parsed.links?.portfolio || parsed.portfolioUrl || parsed.personal?.portfolioUrl || parsed.person?.portfolioUrl || "",
           masterResumeYaml: text,
-          masterResumeText: parsed.summary || parsed.personal?.summary || "",
+          masterResumeText: parsed.summary || parsed.personal?.summary || parsed.person?.summary || parsed.personal_info?.summary || "",
           updatedAt: new Date().toISOString()
         };
 

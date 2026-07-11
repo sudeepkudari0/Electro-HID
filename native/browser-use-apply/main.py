@@ -249,7 +249,9 @@ Instructions:
 3. If it is an external board (like Greenhouse or Lever) or a company site, navigate to the application form.
 4. Fill all required fields truthfully. Use your available custom actions to retrieve candidate details, screening answers, and EEO/demographic information.
 5. If you need sensitive candidate details (like full name, email, phone, or location), use the provided sensitive data placeholders (e.g., wrap them in <secret> tags as instructed).
-6. Upload the resume at the file input. The resume path is: {resume_path}
+6. Handle resume selection:
+   - For LinkedIn Easy Apply: If one or more resumes are already uploaded and listed on the page, use the already selected/listed resume. DO NOT upload a new resume. Only upload the resume from {resume_path} if no resume is currently uploaded or selected.
+   - For other job boards/sites: Upload the resume at the file input. The resume path is: {resume_path}
 7. {submit_instructions}
 8. Once finished, write a short summary stating: "RESULT:APPLIED" or "RESULT:FAILED" or "RESULT:LOGIN_ISSUE".
 """
