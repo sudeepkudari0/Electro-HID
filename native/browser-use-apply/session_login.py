@@ -32,11 +32,12 @@ async def wait_for_linkedin_auth(context, page, timeout=900):
             cookies = await context.cookies()
             li_at_cookie = [c for c in cookies if c.get("name") == "li_at" and "linkedin.com" in c.get("domain", "")]
             if li_at_cookie:
-                return {
-                    "success": True,
-                    "reason": "li_at_cookie_present",
-                    "url": current_url
-                }
+                if not ("login" in current_url or "signup" in current_url or "checkpoint" in current_url or "challengeId" in current_url):
+                    return {
+                        "success": True,
+                        "reason": "li_at_cookie_present",
+                        "url": current_url
+                    }
 
         except Exception:
             break
@@ -46,11 +47,13 @@ async def wait_for_linkedin_auth(context, page, timeout=900):
         cookies = await context.cookies()
         li_at_cookie = [c for c in cookies if c.get("name") == "li_at" and "linkedin.com" in c.get("domain", "")]
         if li_at_cookie:
-            return {
-                "success": True,
-                "reason": "li_at_cookie_present",
-                "url": page.url if not page.is_closed() else ""
-            }
+            current_url = page.url if not page.is_closed() else ""
+            if current_url and not ("login" in current_url or "signup" in current_url or "checkpoint" in current_url or "challengeId" in current_url):
+                return {
+                    "success": True,
+                    "reason": "li_at_cookie_present",
+                    "url": current_url
+                }
     except Exception:
         pass
 
