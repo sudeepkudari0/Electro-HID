@@ -75,13 +75,22 @@ Provide structured, professional answers that:
         async (
             promptContext: PromptContext,
             onChunk?: (chunk: string) => void,
-            imageData?: string
+            imageData?: string,
+            signal?: AbortSignal
         ): Promise<string> => {
             setIsGenerating(true);
             setError(null);
 
             try {
                 const template = getPromptTemplate(promptContext);
+
+                const requestId = Math.random().toString(36).substring(7);
+                if (signal) {
+                    signal.addEventListener('abort', () => {
+                        window.electronAPI.llmAbort(requestId);
+                        setIsGenerating(false);
+                    });
+                }
 
                 const response = await window.electronAPI.llmGenerate({
                     systemPrompt: template.system,
@@ -90,7 +99,12 @@ Provide structured, professional answers that:
                     maxTokens: options.maxTokens ?? 512,
                     stream: !!onChunk,
                     imageData,
+                    requestId,
                 }, onChunk);
+
+                if (signal?.aborted) {
+                    throw new Error('AbortError');
+                }
 
                 if (response.success) {
                     return response.text || '';
@@ -155,7 +169,8 @@ Provide structured, professional answers that:
         async (
             question: string,
             resumeContext?: string,
-            onChunk?: (chunk: string) => void
+            onChunk?: (chunk: string) => void,
+            signal?: AbortSignal
         ): Promise<string> => {
             // Map legacy call to the new template engine
             return generateAnswerWithTemplate({
@@ -163,7 +178,7 @@ Provide structured, professional answers that:
                 currentQuestion: question,
                 conversationHistory: '', // We don't have this in the legacy signature
                 resume: resumeContext,
-            }, onChunk);
+            }, onChunk, undefined, signal);
         },
         [generateAnswerWithTemplate]
     );

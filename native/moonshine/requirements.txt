@@ -5,3 +5,4 @@ soundfile==0.12.1
 numpy==1.26.4
 moonshine-voice 
 onnxruntime-gpu==1.17.1
+spacy>=3.7.4

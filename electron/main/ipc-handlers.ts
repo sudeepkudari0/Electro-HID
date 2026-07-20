@@ -223,6 +223,53 @@ export function registerIPCHandlers(): void {
         }
     });
 
+    // Active LLM requests for aborting
+    const activeLlmRequests = new Map<string, AbortController>();
+
+    ipcMain.handle('llm:abort', async (event: any, requestId: string) => {
+        const controller = activeLlmRequests.get(requestId);
+        if (controller) {
+            controller.abort();
+            activeLlmRequests.delete(requestId);
+            return { success: true };
+        }
+        return { success: false, error: 'Request not found' };
+    });
+
+    ipcMain.handle('nlp:setup', async () => {
+        try {
+            const { exec } = await import('child_process');
+            const path = await import('path');
+            const moonshineDir = app.isPackaged 
+                ? path.join(process.resourcesPath, 'moonshine') 
+                : path.join(app.getAppPath(), 'native', 'moonshine');
+
+            return new Promise((resolve) => {
+                const isWin = process.platform === 'win32';
+                const pyCmd = isWin ? 'python' : 'python3';
+                const venvDir = path.join(moonshineDir, '.venv');
+                
+                const activateCmd = isWin 
+                    ? `"${path.join(venvDir, 'Scripts', 'activate.bat')}"`
+                    : `. "${path.join(venvDir, 'bin', 'activate')}"`;
+
+                const cmd = `"${pyCmd}" -m venv "${venvDir}" && ${activateCmd} && pip install click "spacy>=3.7.4" && python -m spacy download en_core_web_sm`;
+                    
+                exec(cmd, { cwd: moonshineDir }, (error, stdout, stderr) => {
+                    if (error) {
+                        console.error('NLP Setup failed:', stderr || error.message);
+                        resolve({ success: false, error: stderr || error.message });
+                    } else {
+                        console.log('NLP Setup output:', stdout);
+                        resolve({ success: true });
+                    }
+                });
+            });
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
+    });
+
     // LLM: Generate response
     ipcMain.handle('llm:generate', async (event: any, options: {
         systemPrompt: string;
@@ -236,24 +283,35 @@ export function registerIPCHandlers(): void {
         try {
             const { getLLMService } = await import('./llm/llm-service');
             const llmService = getLLMService();
+            const requestId = options.requestId || 'default';
+            
+            const controller = new AbortController();
+            activeLlmRequests.set(requestId, controller);
+            
+            const generateOptions = { ...options, signal: controller.signal };
 
             if (options.stream) {
-                const requestId = options.requestId || 'default';
-                const result = await llmService.generate(options);
+                const result = await llmService.generate(generateOptions);
                 
                 if (result.stream) {
                     const stream = result.stream;
                     (async () => {
                         try {
                             for await (const chunk of stream) {
+                                if (controller.signal.aborted) break;
                                 event.sender.send(`llm:chunk:${requestId}`, { chunk });
                             }
-                            event.sender.send(`llm:done:${requestId}`);
+                            if (!controller.signal.aborted) {
+                                event.sender.send(`llm:done:${requestId}`);
+                            }
                         } catch (error) {
+                            if (controller.signal.aborted) return;
                             console.error('IPC: Streaming failed:', error);
                             event.sender.send(`llm:error:${requestId}`, { 
                                 error: error instanceof Error ? error.message : 'Streaming failed' 
                             });
+                        } finally {
+                            activeLlmRequests.delete(requestId);
                         }
                     })();
                 }
@@ -263,11 +321,15 @@ export function registerIPCHandlers(): void {
                     streaming: true,
                 };
             } else {
-                const result = await llmService.generate(options);
-                return {
-                    success: true,
-                    text: result.text,
-                };
+                try {
+                    const result = await llmService.generate(generateOptions);
+                    return {
+                        success: true,
+                        text: result.text,
+                    };
+                } finally {
+                    activeLlmRequests.delete(requestId);
+                }
             }
         } catch (error) {
             console.error('IPC: LLM generation failed:', error);

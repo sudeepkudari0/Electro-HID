@@ -22,12 +22,15 @@ import soundfile as sf
 import uvicorn
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
+import spacy
 
 # Force ONNX Runtime to use CUDA
 os.environ["CUDA_VISIBLE_DEVICES"] = "0" 
 
 app = FastAPI()
 transcriber = None
+nlp = None
 
 @app.on_event("startup")
 def initialize_model():
@@ -59,6 +62,14 @@ def initialize_model():
         transcriber = Transcriber(model_path=str(path), model_arch=arch)
 
     print("Model loaded successfully.")
+    
+    global nlp
+    try:
+        nlp = spacy.load("en_core_web_sm")
+        print("spaCy model en_core_web_sm loaded successfully.")
+    except Exception as e:
+        print(f"Failed to load spaCy model: {e}")
+        print("Please run: python -m spacy download en_core_web_sm")
 
 @app.post("/inference")
 async def inference(file: UploadFile = File(...)):
@@ -118,6 +129,49 @@ async def inference(file: UploadFile = File(...)):
         print(f"Transcription error: {e}")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
+class TextRequest(BaseModel):
+    text: str
+
+@app.post("/nlp/check-completeness")
+async def check_completeness(req: TextRequest):
+    if not nlp:
+        raise HTTPException(status_code=503, detail="NLP model not loaded")
+    
+    text = req.text.strip()
+    if not text:
+        return {"is_complete": False, "reason": "empty"}
+        
+    doc = nlp(text)
+    
+    # A simple syntactic completeness heuristic:
+    # Look for the root verb and see if it lacks an expected object,
+    # or if the sentence ends in an unexpected preposition/subordinating conjunction.
+    
+    # Find the root token
+    roots = [token for token in doc if token.head == token]
+    if not roots:
+        return {"is_complete": False, "reason": "no root"}
+        
+    root = roots[0]
+    
+    # If root is not a verb/auxiliary, and there's no verb in the sentence, it's likely a fragment.
+    has_verb = any(token.pos_ in ["VERB", "AUX"] for token in doc)
+    if not has_verb:
+        # e.g., "A URL shortener."
+        return {"is_complete": False, "reason": "no verb"}
+        
+    # Check if the last token is a trailing preposition or conjunction (e.g., "Can you explain about")
+    last_token = doc[-1]
+    if last_token.pos_ in ["ADP", "SCONJ"] and last_token.dep_ == "prep":
+        return {"is_complete": False, "reason": "trailing preposition"}
+        
+    # Check if the root verb is missing an expected direct object (heuristic)
+    # Some verbs are transitive and usually require an object.
+    # For now, if there's a verb and it's not obviously trailing, we mark it plausibly complete.
+    # The heuristic can be tightened based on interview question data.
+    
+    return {"is_complete": True, "reason": "plausibly complete"}
 
 @app.get("/")
 def health():

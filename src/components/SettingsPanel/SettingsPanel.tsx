@@ -74,6 +74,10 @@ export function SettingsPanel({ onClose, onSettingsChanged }: SettingsPanelProps
     const [selectedMoonshineDownload, setSelectedMoonshineDownload] = useState('MEDIUM_STREAMING');
     const [serverStatus, setServerStatus] = useState<{ exists: boolean; error?: string } | null>(null);
 
+    const [isSettingUpNLP, setIsSettingUpNLP] = useState(false);
+    const [nlpSetupStatus, setNlpSetupStatus] = useState<string | null>(null);
+    const [nlpInstalled, setNlpInstalled] = useState(false);
+
     const downloadableModels = ['tiny.en', 'base.en', 'small.en', 'medium.en'];
     const downloadableMoonshineModels = ['TINY', 'BASE', 'TINY_STREAMING', 'BASE_STREAMING', 'SMALL_STREAMING', 'MEDIUM_STREAMING'];
     const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -438,6 +442,24 @@ export function SettingsPanel({ onClose, onSettingsChanged }: SettingsPanelProps
         }
     };
 
+    const handleSetupNLP = async () => {
+        setIsSettingUpNLP(true);
+        setNlpSetupStatus("Installing spaCy and en_core_web_sm model...");
+        try {
+            const res = await (window.electronAPI as any).nlpSetup();
+            if (res.success) {
+                setNlpInstalled(true);
+                setNlpSetupStatus("Installed Successfully!");
+            } else {
+                setNlpSetupStatus(`Error: ${res.error}`);
+            }
+        } catch (e: any) {
+            setNlpSetupStatus(`Error: ${e.message}`);
+        } finally {
+            setIsSettingUpNLP(false);
+        }
+    };
+
     return (
         <div className="flex flex-col flex-1 h-full border-t border-[var(--border-subtle)] animate-slide-up bg-zinc-900">
             {/* Header */}
@@ -764,6 +786,27 @@ export function SettingsPanel({ onClose, onSettingsChanged }: SettingsPanelProps
                                     </p>
                                 </div>
                             )}
+
+                            <div className="pt-4 border-t border-zinc-800">
+                                <label className="block text-sm font-medium text-zinc-300 mb-1">
+                                    Zero-Latency NLP Model (spaCy)
+                                </label>
+                                <p className="mb-2 text-xs text-zinc-500">
+                                    Required for the zero-latency question detection sidecar to perform grammatical checks.
+                                </p>
+                                <div className="flex gap-2 mb-2 items-center">
+                                    <button
+                                        onClick={handleSetupNLP}
+                                        disabled={isSettingUpNLP || nlpInstalled}
+                                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+                                    >
+                                        {nlpInstalled ? 'Installed' : (isSettingUpNLP ? 'Installing...' : 'Install NLP Dependencies')}
+                                    </button>
+                                    {nlpSetupStatus && (
+                                        <span className="text-xs text-zinc-400">{nlpSetupStatus}</span>
+                                    )}
+                                </div>
+                            </div>
                         </div>
                     )}
 

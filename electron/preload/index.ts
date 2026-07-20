@@ -102,11 +102,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
             stream?: boolean;
             imageData?: string;
             format?: string;
+            requestId?: string;
         },
         onChunk?: (chunk: string) => void
     ) => {
         if (onChunk) {
-            const requestId = Math.random().toString(36).substring(7);
+            const requestId = options.requestId || Math.random().toString(36).substring(7);
             const chunkHandler = (_event: any, data: { chunk: string }) => onChunk(data.chunk);
             const doneHandler = () => cleanup();
             const errorHandler = (_event: any, data: { error: string }) => {
@@ -127,6 +128,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
             return await ipcRenderer.invoke('llm:generate', { ...options, requestId });
         }
         return await ipcRenderer.invoke('llm:generate', options);
+    },
+
+    llmAbort: async (requestId: string) => {
+        return await ipcRenderer.invoke('llm:abort', requestId);
+    },
+
+    nlpSetup: async () => {
+        return await ipcRenderer.invoke('nlp:setup');
     },
 
     // App control API

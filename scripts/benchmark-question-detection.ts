@@ -8,6 +8,13 @@
  *   4. classifyQuestion() — interview type classification
  *   5. findDuplicateIndex() — candidate dedup (store layer)
  * 
+ * ADDED: Real-world messy transcript scenarios (multi-question blobs, compound
+ * questions, trailing statements, self-correction, split questions across VAD
+ * utterances, preamble-heavy questions). These are NOT scored pass/fail against
+ * the accuracy tally — the current pipeline has no segmentation logic, so the
+ * goal here is to OBSERVE actual behavior on realistic input and use that as a
+ * baseline before building sentence/clause segmentation.
+ * 
  * Run: bun run scripts/benchmark-question-detection.ts
  */
 
@@ -25,6 +32,7 @@ interface TestCase {
     expectedQuestion: boolean;
     expectedType?: string;
     category: string;
+    note?: string; // documents the specific real-world failure mode being tested (real-world cases only)
 }
 
 const TEST_CORPUS: TestCase[] = [
@@ -89,6 +97,94 @@ const TEST_CORPUS: TestCase[] = [
     // ── User speech (echo suppressor path) ──
     { text: "I worked on a distributed system at my previous company using microservices.", speaker: 'user', expectedQuestion: false, category: 'user-speech' },
     { text: "Yes, I have experience with React and TypeScript.", speaker: 'user', expectedQuestion: false, category: 'user-speech' },
+
+    // ── NEW: Real-World Messy Transcript Scenarios ───
+    // These simulate what VAD/STT actually hands the pipeline in a live interview —
+    // NOT clean, atomic, single-question strings. Excluded from the accuracy tally;
+    // reported separately below so you can inspect actual behavior vs. expected.
+
+    // Multi-question blob: intro pleasantries + two distinct questions in one VAD utterance
+    {
+        text: "So welcome, thanks for joining today, really appreciate you making the time. I want to start with a quick one — can you walk me through your background? And then I'd love to know why you're interested in this particular role, and how it fits with where you want to go.",
+        speaker: 'interviewer',
+        expectedQuestion: true,
+        category: 'multi-question-blob',
+        note: 'Contains 2 distinct questions + preamble. Detector will likely return isQuestion=true for the whole blob, classifier picks ONE type, and the LLM prompt receives both questions + pleasantries as "the question."',
+    },
+
+    // Rapid-fire compound HR question in one breath
+    {
+        text: "What's your notice period, and would you need relocation assistance if we moved forward?",
+        speaker: 'interviewer',
+        expectedQuestion: true,
+        expectedType: 'hr-screening',
+        category: 'compound-question',
+        note: 'Two HR questions joined by "and". Classifier/LLM likely only substantively addresses the first.',
+    },
+
+    // Question + trailing statement after it (context contamination)
+    {
+        text: "How do you handle conflict on a team? We've had some issues with that lately.",
+        speaker: 'interviewer',
+        expectedQuestion: true,
+        category: 'trailing-statement',
+        note: 'Trailing statement after "?" gets passed into currentQuestion context and may bias the answer.',
+    },
+
+    // Self-correction / stutter mid-question
+    {
+        text: "What's your — sorry, what would you say is your biggest weakness?",
+        speaker: 'interviewer',
+        expectedQuestion: true,
+        category: 'self-correction',
+        note: 'Repeated "what" phrase across a self-correction. Check this does NOT get caught by hallucination-filter repetition-loop logic.',
+    },
+
+    // Under-segmentation: VAD cuts a single question into two utterances at a pause
+    {
+        text: "How would you design",
+        speaker: 'interviewer',
+        expectedQuestion: false,
+        category: 'split-question-part1',
+        note: 'First half of a question split by a >600ms pause. Alone, this scores as NOT a question — this is the inverse failure mode (should combine with next utterance, not discard).',
+    },
+    {
+        text: "a URL shortener for a billion users?",
+        speaker: 'interviewer',
+        expectedQuestion: true,
+        category: 'split-question-part2',
+        note: 'Second half. In isolation this may or may not clear threshold — but it should never be scored in isolation; it belongs with part1.',
+    },
+
+    // Long rambling context-setting before the actual ask (common in system-design rounds)
+    {
+        text: "Let's say you're at a company that's growing fast, user base is doubling every quarter, and the current monolith is starting to show cracks under load. Given that context, how would you approach breaking it apart into services?",
+        speaker: 'interviewer',
+        expectedQuestion: true,
+        expectedType: 'system-design',
+        category: 'preamble-heavy-question',
+        note: 'Long scenario-setting before the real question. Whole blob will hit LLM as currentQuestion — check if answer quality degrades from having to parse 2 sentences of setup.',
+    },
+
+    // Two fully independent questions with no connector at all, just two sentences back to back
+    {
+        text: "What's your experience with Kubernetes? Also, have you worked with any service mesh tools like Istio?",
+        speaker: 'interviewer',
+        expectedQuestion: true,
+        category: 'two-independent-questions',
+        note: 'No "and" — just two separate question sentences. Easiest case to split correctly via sentence boundary — good first test for segmentation logic.',
+    },
+];
+
+const REALWORLD_CATEGORIES = [
+    'multi-question-blob',
+    'compound-question',
+    'trailing-statement',
+    'self-correction',
+    'split-question-part1',
+    'split-question-part2',
+    'preamble-heavy-question',
+    'two-independent-questions',
 ];
 
 // ─── Pipeline (mirrors App.tsx exactly) ───
@@ -257,7 +353,7 @@ for (const [name, values] of Object.entries(stageAgg)) {
 }
 console.log('└──────────────────┴──────────┴──────────┴────────────┘');
 
-// ─── Report: Per-Utterance Detail ───
+// ─── Report: Per-Utterance Detail (excludes real-world scenarios — see separate section) ───
 
 console.log('\n┌──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐');
 console.log('│  PER-UTTERANCE RESULTS                                                                                                     │');
@@ -270,6 +366,8 @@ let total = 0;
 
 for (let j = 0; j < TEST_CORPUS.length; j++) {
     const tc = TEST_CORPUS[j];
+    if (REALWORLD_CATEGORIES.includes(tc.category)) continue; // reported separately below
+
     const data = perCase.get(j)!;
     const res = data.result;
     const avgLat = data.latencies.reduce((s, v) => s + v, 0) / data.latencies.length;
@@ -300,8 +398,34 @@ for (let j = 0; j < TEST_CORPUS.length; j++) {
 
 console.log('└────┴─────────────────────────────────────────────────────────┴───────┴──────────┴────────┴───────────────┴──────────┴─────────┘');
 
-// ─── Accuracy Summary ───
+// ─── Accuracy Summary (clean corpus only) ───
 
 const accuracy = total > 0 ? (correct / total * 100).toFixed(1) : '0';
-console.log(`\n  Accuracy: ${correct}/${total} (${accuracy}%) on interviewer utterances`);
-console.log(`  Total benchmark time: ${(allLatencies.reduce((s, v) => s + v, 0) / 1000).toFixed(1)}ms for ${allLatencies.length} pipeline runs\n`);
+console.log(`\n  Accuracy: ${correct}/${total} (${accuracy}%) on interviewer utterances (clean corpus only)`);
+
+// ─── Report: Real-World Scenario Behavior (informational, not pass/fail) ───
+// The current pipeline has no segmentation logic, so these aren't scored right/wrong —
+// the point is to see EXACTLY what the detector/classifier does with messy, realistic
+// input so we know where in the pipeline segmentation needs to be inserted.
+
+console.log('\n┌──────────────────────────────────────────────────────────────────────────────────────┐');
+console.log('│  REAL-WORLD SCENARIO BEHAVIOR (no pass/fail — inspect actual output vs. note)      │');
+console.log('└──────────────────────────────────────────────────────────────────────────────────────┘');
+
+for (let j = 0; j < TEST_CORPUS.length; j++) {
+    const tc = TEST_CORPUS[j];
+    if (!REALWORLD_CATEGORIES.includes(tc.category)) continue;
+
+    const data = perCase.get(j)!;
+    const res = data.result;
+    const gotQuestion = res.detection?.isQuestion ?? false;
+    const score = res.detection?.score;
+
+    console.log(`\n  [${tc.category}]`);
+    console.log(`  Text: "${tc.text}"`);
+    console.log(`  Detected as question: ${gotQuestion} | Score: ${score ?? '—'} | Type: ${res.interviewType || '—'}`);
+    console.log(`  Signals: ${res.detection?.signals?.join(', ') || '—'}`);
+    console.log(`  Note: ${tc.note}`);
+}
+
+console.log(`\n  Total benchmark time: ${(allLatencies.reduce((s, v) => s + v, 0) / 1000).toFixed(1)}ms for ${allLatencies.length} pipeline runs\n`);

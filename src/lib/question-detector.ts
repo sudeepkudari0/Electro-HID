@@ -12,6 +12,7 @@ export interface DetectionResult {
     isQuestion: boolean;
     confidence: number;
     signals: string[]; // which signals contributed
+    syntacticallyComplete?: boolean;
 }
 
 // ─── Signal 1: Question mark ───
@@ -92,11 +93,13 @@ const QUESTION_THRESHOLD = 25;
  * @param text - The full utterance text to analyze
  * @param _context - Optional conversation context (unused in heuristic mode)
  * @param _mode - Detection mode (heuristic is now the default and recommended)
+ * @param skipNlp - If true, skips the external NLP completeness check
  */
 export async function isQuestion(
     text: string,
     _context: string[] = [],
-    _mode: DetectionMode = 'heuristic'
+    _mode: DetectionMode = 'heuristic',
+    skipNlp: boolean = false
 ): Promise<DetectionResult> {
     const trimmed = text.trim();
     if (!trimmed || trimmed.length < 5) {
@@ -118,13 +121,38 @@ export async function isQuestion(
     const totalScore = signals.reduce((sum, s) => sum + s.score, 0);
     const activeSignals = signals.filter(s => s.score > 0).map(s => s.name);
 
-    const isQ = totalScore >= QUESTION_THRESHOLD;
+    let isQ = totalScore >= QUESTION_THRESHOLD;
     const confidence = Math.min(Math.max(totalScore / 60, 0), 1.0);
+    
+    let syntacticallyComplete = true;
+
+    // Call Tier 1 Gate (Python sidecar) if it looks like a question
+    if (isQ && !skipNlp) {
+        try {
+            const res = await fetch('http://127.0.0.1:8178/nlp/check-completeness', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: trimmed })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                syntacticallyComplete = data.is_complete;
+                if (!syntacticallyComplete) {
+                    console.log(`[NLP Gate] Fragment detected: "${trimmed}" Reason: ${data.reason}`);
+                    // We don't necessarily clear isQ here, but we pass the flag
+                    // so the caller can decide whether to speculatively fire.
+                }
+            }
+        } catch (err) {
+            console.warn('[NLP Gate] Failed to connect to Python sidecar, skipping syntactic check.', err);
+        }
+    }
 
     return {
         isQuestion: isQ,
         confidence,
         signals: activeSignals,
+        syntacticallyComplete,
     };
 }
 

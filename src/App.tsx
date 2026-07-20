@@ -8,8 +8,9 @@ import {
 } from "./hooks/useMixedAudioRecorder";
 import { useLLM } from "./hooks/useLLM";
 import { useProfile } from "./hooks/useProfile";
+import { addCandidateQuestion, setCandidateStatus, updateCandidateAnswer } from "./store/candidates";
+import { isQuestion } from "./lib/question-detector";
 import { classifyQuestion } from "./lib/interview-classifier";
-import { isQuestionSync } from "./lib/question-detector";
 import { analyzeDelivery } from "./lib/delivery-analyzer";
 import { getCodeAnalysisPrompt } from "./lib/prompts/templates/code-analysis";
 import { TimestampDeduplicator } from "./lib/timestamp-deduplicator";
@@ -440,6 +441,9 @@ function App(): JSX.Element {
     };
   }
 
+  // Active speculative LLM generation abort controller
+  const activeAutoAnswerAbortControllerRef = useRef<AbortController | null>(null);
+
   // ─── Detection Window ───
   const DETECTION_WINDOW_MS = 1500;
 
@@ -447,7 +451,7 @@ function App(): JSX.Element {
     // 3s cooldown between detections to avoid flooding the candidates list
     if (Date.now() - lastDetectionTimeRef.current < 3000) return;
 
-    autoDetectTimeoutRef.current = setTimeout(() => {
+    autoDetectTimeoutRef.current = setTimeout(async () => {
       autoDetectTimeoutRef.current = null;
 
       if (!autoDetectionEnabled) return;
@@ -458,15 +462,16 @@ function App(): JSX.Element {
         .find((b) => b.speaker === "interviewer");
       if (!lastInterviewerBlock || !lastInterviewerBlock.text.trim()) return;
 
-      const detection = isQuestionSync(lastInterviewerBlock.text);
+      const detection = await isQuestion(lastInterviewerBlock.text);
 
       console.log(
         `[Detection] "${lastInterviewerBlock.text.slice(0, 80)}..." => ` +
           `isQuestion=${detection.isQuestion}, confidence=${detection.confidence.toFixed(2)}, ` +
-          `signals=[${detection.signals.join(", ")}]`,
+          `signals=[${detection.signals.join(", ")}], complete=${detection.syntacticallyComplete}`,
       );
 
-      if (detection.isQuestion) {
+      // Only proceed if it is syntactically complete (Tier 1 Gate passed)
+      if (detection.isQuestion && detection.syntacticallyComplete) {
         lastDetectionTimeRef.current = Date.now();
         // Add to candidates list — deduplication happens inside the store
         const candidateId = addCandidateQuestion(
@@ -477,8 +482,14 @@ function App(): JSX.Element {
 
         // Auto-generate answer for high-confidence questions
         if (candidateId && detection.confidence >= autoAnswerConfidenceThresholdRef.current) {
-            console.log(`[Detection] Auto-generating answer for candidate ${candidateId} (confidence ${detection.confidence.toFixed(2)} >= ${autoAnswerConfidenceThresholdRef.current})`);
-            handlePickQuestionRef.current(candidateId, lastInterviewerBlock.text);
+            console.log(`[Detection] Auto-generating answer speculatively for ${candidateId}`);
+            const controller = new AbortController();
+            activeAutoAnswerAbortControllerRef.current = controller;
+            handlePickQuestionRef.current(candidateId, lastInterviewerBlock.text, controller.signal).finally(() => {
+                if (activeAutoAnswerAbortControllerRef.current === controller) {
+                    activeAutoAnswerAbortControllerRef.current = null;
+                }
+            });
         }
       }
     }, DETECTION_WINDOW_MS);
@@ -505,6 +516,13 @@ function App(): JSX.Element {
       clearTimeout(autoDetectTimeoutRef.current);
       autoDetectTimeoutRef.current = null;
     }
+    
+    // Tier 2: Speculative cancellation
+    if (activeAutoAnswerAbortControllerRef.current) {
+        console.log("[Detection] Interviewer resumed speaking — ABORTING speculative LLM generation!");
+        activeAutoAnswerAbortControllerRef.current.abort();
+        activeAutoAnswerAbortControllerRef.current = null;
+    }
   }, []);
 
   const handleAudioChunk = useCallback(
@@ -527,6 +545,7 @@ function App(): JSX.Element {
   const handlePickQuestion = async (
     candidateId: string,
     _questionText: string,
+    signal?: AbortSignal
   ) => {
     // Mark the candidate as "answering"
     setCandidateStatus(candidateId, "answering");
@@ -568,13 +587,25 @@ function App(): JSX.Element {
             isStreaming: true,
           });
         },
+        undefined,
+        signal
       );
 
       updateCandidateAnswer(candidateId, {
         isStreaming: false,
         status: "answered",
       });
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.message === 'AbortError') {
+          console.log(`[Detection] Answer generation for ${candidateId} was successfully aborted.`);
+          // Clear the UI so it doesn't look broken
+          updateCandidateAnswer(candidateId, {
+              answer: "Cancelled (Interviewer continued speaking...)",
+              isStreaming: false,
+              status: "answered"
+          });
+          return;
+      }
       console.error("Failed to generate answer:", error);
       updateCandidateAnswer(candidateId, {
         answer: "Failed to generate answer.",

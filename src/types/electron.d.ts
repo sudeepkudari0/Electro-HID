@@ -69,6 +69,7 @@ interface ElectronAPI {
       stream?: boolean;
       imageData?: string;
       format?: string;
+      requestId?: string;
     },
     onChunk?: (chunk: string) => void,
   ) => Promise<{
@@ -77,6 +78,8 @@ interface ElectronAPI {
     streaming?: boolean;
     error?: string;
   }>;
+  llmAbort: (requestId: string) => Promise<{ success: boolean; error?: string }>;
+  nlpSetup: () => Promise<{ success: boolean; error?: string }>;
   quitApp: () => Promise<{ success: boolean; error?: string }>;
 
   getSettings: () => Promise<{

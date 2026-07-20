@@ -14,6 +14,7 @@ export interface LLMOptions {
     imageData?: string; // Base64 encoded image for vision APIs
     task?: 'interview' | 'tailor' | 'apply';
     modelOverride?: string;
+    signal?: AbortSignal;
 }
 
 /**
@@ -502,7 +503,7 @@ export class LLMService {
             messages,
             temperature: options.temperature ?? 0.7,
             max_tokens: options.maxTokens,
-        });
+        }, { signal: options.signal });
 
         return response.choices[0]?.message?.content || '';
     }
@@ -535,7 +536,7 @@ export class LLMService {
             temperature: options.temperature ?? 0.7,
             max_tokens: options.maxTokens,
             stream: true,
-        });
+        }, { signal: options.signal });
 
         for await (const chunk of stream) {
             const content = chunk.choices[0]?.delta?.content;
@@ -570,6 +571,7 @@ export class LLMService {
             const response = await fetch(`${baseUrl}/api/chat`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                signal: options.signal,
                 body: JSON.stringify({
                     model: options.modelOverride || this.config.ollamaModel,
                     messages,
@@ -637,6 +639,7 @@ export class LLMService {
             const response = await fetch(`${baseUrl}/api/chat`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                signal: options.signal,
                 body: JSON.stringify(payload)
             });
 
@@ -822,7 +825,7 @@ export class LLMService {
             messages,
             temperature: options.temperature ?? 0.7,
             max_tokens: options.maxTokens,
-        });
+        }, { signal: options.signal });
 
         return response.choices[0]?.message?.content || '';
     }
