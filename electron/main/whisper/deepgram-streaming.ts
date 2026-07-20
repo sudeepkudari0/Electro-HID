@@ -164,9 +164,6 @@ class DeepgramChannelSession {
         } else if (type === 'UtteranceEnd') {
             debugLog(`[${this.speaker}] Utterance end`);
             this.callbacks.onUtteranceEnd(this.speaker);
-        } else if (type === 'SpeechStarted') {
-            debugLog(`[${this.speaker}] Speech started`);
-            this.callbacks.onSpeechStarted(this.speaker);
         } else if (type === 'Metadata') {
             debugLog(`[${this.speaker}] Metadata:`, msg);
         } else if (type === 'Error') {

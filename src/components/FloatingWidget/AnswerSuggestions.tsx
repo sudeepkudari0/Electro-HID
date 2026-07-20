@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Trash2, Sparkles, Copy, Check, Zap, Loader2, ChevronDown, ChevronRight } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import { parseProgressiveJson } from '../../lib/prompts/parse-json';
 import type { CandidateQuestion, DetectedQuestion } from '../../state';
 
 interface AnswerSuggestionsProps {
@@ -30,13 +31,7 @@ function CandidateCard({
     const [copied, setCopied] = useState(false);
     const [isCollapsed, setIsCollapsed] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
-
-    // Auto-scroll during streaming
-    useEffect(() => {
-        if (candidate.isStreaming && scrollRef.current) {
-            scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-        }
-    }, [candidate.answer, candidate.isStreaming]);
+    const structuredJson = parseProgressiveJson(candidate.answer || '');
 
     const handleCopy = async (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -145,31 +140,81 @@ function CandidateCard({
                 <div className="border-t border-zinc-700/30">
                     <div
                         ref={scrollRef}
-                        className="px-3.5 py-3 max-h-[300px] overflow-y-auto"
+                        className="px-3.5 py-3 max-h-[300px] overflow-y-auto select-text"
                     >
-                        <div className="text-[13px] leading-relaxed text-[var(--text-primary)] answer-content prose prose-invert prose-sm max-w-none">
-                            <ReactMarkdown
-                                components={{
-                                    code({ className, children, ...props }) {
-                                        const match = /language-(\w+)/.exec(className || '');
-                                        const isInline = !match;
-                                        if (isInline) {
+                        <div className="text-[13px] leading-relaxed text-[var(--text-primary)] answer-content select-text prose prose-invert prose-sm max-w-none">
+                            {structuredJson ? (
+                                <div className="space-y-3.5 animate-fade-in">
+                                    {structuredJson.hook && (
+                                        <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-lg p-3">
+                                            <div className="flex items-center gap-1.5 text-xs font-semibold text-indigo-400 mb-1">
+                                                <span>🎯</span>
+                                                <span>Direct Hook</span>
+                                            </div>
+                                            <p className="text-sm font-medium text-indigo-100 leading-snug">
+                                                {structuredJson.hook}
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {structuredJson.points && structuredJson.points.length > 0 && (
+                                        <div className="space-y-2 px-1">
+                                            <div className="flex items-center gap-1.5 text-xs font-semibold text-zinc-400">
+                                                <span>💬</span>
+                                                <span>Key Talking Points</span>
+                                            </div>
+                                            <ul className="space-y-2">
+                                                {structuredJson.points.map((point, idx) => (
+                                                    <li key={idx} className="flex items-start gap-2.5 text-sm text-zinc-200">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-2 shrink-0 shadow-[0_0_8px_rgba(52,211,153,0.6)]" />
+                                                        <span className="leading-relaxed">{point}</span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+
+                                    {structuredJson.edgeCase && (
+                                        <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 mt-2">
+                                            <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-400 mb-1">
+                                                <span>⚠️</span>
+                                                <span>Edge Case / Nuance</span>
+                                            </div>
+                                            <p className="text-xs font-medium text-amber-200/90 leading-snug">
+                                                {structuredJson.edgeCase}
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (candidate.answer?.trim().startsWith('{') || candidate.answer?.trim().startsWith('```')) && candidate.isStreaming ? (
+                                <div className="flex items-center gap-2 text-xs text-indigo-400 py-2 animate-pulse font-medium">
+                                    <span>⏳</span>
+                                    <span>Formatting teleprompter notes...</span>
+                                </div>
+                            ) : (
+                                <ReactMarkdown
+                                    components={{
+                                        code({ className, children, ...props }) {
+                                            const match = /language-(\w+)/.exec(className || '');
+                                            const isInline = !match;
+                                            if (isInline) {
+                                                return (
+                                                    <code className="bg-zinc-800 text-emerald-400 px-1.5 py-0.5 rounded text-xs font-mono" {...props}>
+                                                        {children}
+                                                    </code>
+                                                );
+                                            }
                                             return (
-                                                <code className="bg-zinc-800 text-emerald-400 px-1.5 py-0.5 rounded text-xs font-mono" {...props}>
-                                                    {children}
-                                                </code>
+                                                <pre className="!bg-zinc-900 !m-0 p-3 rounded-lg overflow-x-auto my-2 border border-zinc-700/50">
+                                                    <code className={`${className || ''} text-xs font-mono`} {...props}>{children}</code>
+                                                </pre>
                                             );
-                                        }
-                                        return (
-                                            <pre className="!bg-zinc-900 !m-0 p-3 rounded-lg overflow-x-auto my-2 border border-zinc-700/50">
-                                                <code className={`${className || ''} text-xs font-mono`} {...props}>{children}</code>
-                                            </pre>
-                                        );
-                                    },
-                                }}
-                            >
-                                {candidate.answer}
-                            </ReactMarkdown>
+                                        },
+                                    }}
+                                >
+                                    {candidate.answer}
+                                </ReactMarkdown>
+                            )}
                             {candidate.isStreaming && <span className="streaming-cursor" />}
                         </div>
                     </div>

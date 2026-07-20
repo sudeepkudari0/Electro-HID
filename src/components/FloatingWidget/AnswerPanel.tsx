@@ -13,18 +13,40 @@ interface AnswerPanelProps {
     onClear: () => void;
 }
 
+// Deterministic post-processing safety net for banned vocabulary
+function cleanBannedWords(text: string): string {
+    if (!text) return '';
+    const replacements: Record<string, string> = {
+        'delve': 'explore',
+        'spearhead': 'lead',
+        'spearheaded': 'led',
+        'testament': 'proof',
+        'crucial': 'key',
+        'robust': 'solid',
+        'holistic': 'overall',
+        'moreover': 'also',
+        'furthermore': 'plus',
+        'synergy': 'alignment',
+        'paradigm': 'model',
+        'passionate': 'motivated',
+        'results-driven': 'focused'
+    };
+    let result = text;
+    for (const [banned, replacement] of Object.entries(replacements)) {
+        const regex = new RegExp(`\\b${banned}\\b`, 'gi');
+        result = result.replace(regex, replacement);
+    }
+    return result;
+}
+
+import { parseProgressiveJson } from '../../lib/prompts/parse-json';
+
+
 export function AnswerPanel({ answers, currentIndex, onNavigate, onClear }: AnswerPanelProps) {
     const { useBulletPoints, toggleBulletPoints } = useUIStore();
     const [showFollowUps, setShowFollowUps] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
     const current = answers[currentIndex];
-
-    // Auto-scroll to bottom during streaming
-    useEffect(() => {
-        if (current?.isStreaming && scrollRef.current) {
-            scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-        }
-    }, [current?.answer, current?.isStreaming]);
 
     // Reset follow-ups toggle when answer changes
     useEffect(() => {
@@ -32,6 +54,9 @@ export function AnswerPanel({ answers, currentIndex, onNavigate, onClear }: Answ
     }, [currentIndex]);
 
     if (!current) return null;
+
+    const cleanedAnswerText = cleanBannedWords(current.answer || '');
+    const structuredJson = parseProgressiveJson(cleanedAnswerText);
 
     return (
         <div className="panel-section animate-slide-up">
@@ -116,8 +141,56 @@ export function AnswerPanel({ answers, currentIndex, onNavigate, onClear }: Answ
                 )}
 
                 {/* Answer text */}
-                <div className="text-sm leading-relaxed text-[var(--text-primary)] answer-content prose prose-invert prose-sm max-w-none">
-                    {current.answer ? (
+                <div className="text-sm leading-relaxed text-[var(--text-primary)] answer-content select-text prose prose-invert prose-sm max-w-none">
+                    {structuredJson ? (
+                        <div className="space-y-3.5 animate-fade-in">
+                            {structuredJson.hook && (
+                                <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-lg p-3">
+                                    <div className="flex items-center gap-1.5 text-xs font-semibold text-indigo-400 mb-1">
+                                        <span>🎯</span>
+                                        <span>Direct Hook</span>
+                                    </div>
+                                    <p className="text-sm font-medium text-indigo-100 leading-snug">
+                                        {structuredJson.hook}
+                                    </p>
+                                </div>
+                            )}
+
+                            {structuredJson.points && structuredJson.points.length > 0 && (
+                                <div className="space-y-2 px-1">
+                                    <div className="flex items-center gap-1.5 text-xs font-semibold text-zinc-400">
+                                        <span>💬</span>
+                                        <span>Key Talking Points</span>
+                                    </div>
+                                    <ul className="space-y-2">
+                                        {structuredJson.points.map((point, idx) => (
+                                            <li key={idx} className="flex items-start gap-2.5 text-sm text-zinc-200">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-2 shrink-0 shadow-[0_0_8px_rgba(52,211,153,0.6)]" />
+                                                <span className="leading-relaxed">{point}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+
+                            {structuredJson.edgeCase && (
+                                <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 mt-2">
+                                    <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-400 mb-1">
+                                        <span>⚠️</span>
+                                        <span>Edge Case / Nuance</span>
+                                    </div>
+                                    <p className="text-xs font-medium text-amber-200/90 leading-snug">
+                                        {structuredJson.edgeCase}
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    ) : (cleanedAnswerText.trim().startsWith('{') || cleanedAnswerText.trim().startsWith('```')) && current.isStreaming ? (
+                        <div className="flex items-center gap-2 text-xs text-indigo-400 py-2 animate-pulse font-medium">
+                            <span>⏳</span>
+                            <span>Formatting teleprompter notes...</span>
+                        </div>
+                    ) : current.answer ? (
                         <ReactMarkdown
                             components={{
                                 code({ node, className, children, ...props }) {
@@ -158,7 +231,7 @@ export function AnswerPanel({ answers, currentIndex, onNavigate, onClear }: Answ
                                 },
                             }}
                         >
-                            {current.answer}
+                            {cleanedAnswerText}
                         </ReactMarkdown>
                     ) : (
                         <span className="text-[var(--text-muted)]">Generating...</span>

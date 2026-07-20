@@ -366,3 +366,14 @@ body.is-resizing * {
     background: rgba(255, 255, 255, 0.5);
     border-radius: 2px;
 }
+
+/* ─── Ensure Answer Panel & Generated Content is 100% Selectable ─── */
+.answer-content,
+.answer-content *,
+.panel-section .select-text,
+.panel-section .select-text * {
+    user-select: text !important;
+    -webkit-user-select: text !important;
+    cursor: text;
+}
+
