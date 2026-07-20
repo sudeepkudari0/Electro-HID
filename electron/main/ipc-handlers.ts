@@ -5,6 +5,7 @@ import { BrowserWindow } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import { spawn } from 'child_process';
+import { getNlpDir, getNlpVenvDir, getNlpVenvPython, findPythonExecutable, nlpServerManager } from './nlp/server-manager';
 
 /**
  * Registers all IPC handlers in the Electron main process.
@@ -239,22 +240,17 @@ export function registerIPCHandlers(): void {
     ipcMain.handle('nlp:status', async () => {
         try {
             const { exec } = await import('child_process');
-            const path = await import('path');
-            const fs = await import('fs');
-            const moonshineDir = app.isPackaged 
-                ? path.join(process.resourcesPath, 'moonshine') 
-                : path.join(app.getAppPath(), 'native', 'moonshine');
-
-            const isWin = process.platform === 'win32';
-            const venvDir = path.join(moonshineDir, '.venv');
-            const venvPy = isWin ? path.join(venvDir, 'Scripts', 'python.exe') : path.join(venvDir, 'bin', 'python');
+            const venvPy = getNlpVenvPython();
+            const nlpDir = getNlpDir();
 
             if (!fs.existsSync(venvPy)) {
                 return { installed: false };
             }
 
+            const workDir = fs.existsSync(nlpDir) ? nlpDir : app.getPath('userData');
+
             return new Promise((resolve) => {
-                exec(`"${venvPy}" -c "import spacy; spacy.load('en_core_web_sm')"`, { cwd: moonshineDir }, (error) => {
+                exec(`"${venvPy}" -c "import spacy; spacy.load('en_core_web_sm')"`, { cwd: workDir }, (error) => {
                     if (error) {
                         resolve({ installed: false });
                     } else {
@@ -270,30 +266,41 @@ export function registerIPCHandlers(): void {
     ipcMain.handle('nlp:setup', async () => {
         try {
             const { exec } = await import('child_process');
-            const path = await import('path');
-            const moonshineDir = app.isPackaged 
-                ? path.join(process.resourcesPath, 'moonshine') 
-                : path.join(app.getAppPath(), 'native', 'moonshine');
+            const nlpDir = getNlpDir();
+            const venvDir = getNlpVenvDir();
+            const venvPy = getNlpVenvPython();
+
+            if (!fs.existsSync(nlpDir)) {
+                fs.mkdirSync(nlpDir, { recursive: true });
+            }
+            const venvParent = path.dirname(venvDir);
+            if (!fs.existsSync(venvParent)) {
+                fs.mkdirSync(venvParent, { recursive: true });
+            }
+
+            const pyCmd = findPythonExecutable() || (process.platform === 'win32' ? 'python' : 'python3');
+            const workDir = fs.existsSync(nlpDir) ? nlpDir : app.getPath('userData');
 
             return new Promise((resolve) => {
-                const isWin = process.platform === 'win32';
-                const pyCmd = isWin ? 'python' : 'python3';
-                const venvDir = path.join(moonshineDir, '.venv');
-                
-                const activateCmd = isWin 
-                    ? `"${path.join(venvDir, 'Scripts', 'activate.bat')}"`
-                    : `. "${path.join(venvDir, 'bin', 'activate')}"`;
+                const createVenvCmd = `"${pyCmd}" -m venv "${venvDir}"`;
 
-                const cmd = `"${pyCmd}" -m venv "${venvDir}" && ${activateCmd} && pip install click "spacy>=3.7.4" && python -m spacy download en_core_web_sm`;
-                    
-                exec(cmd, { cwd: moonshineDir }, (error, stdout, stderr) => {
-                    if (error) {
-                        console.error('NLP Setup failed:', stderr || error.message);
-                        resolve({ success: false, error: stderr || error.message });
-                    } else {
-                        console.log('NLP Setup output:', stdout);
-                        resolve({ success: true });
+                exec(createVenvCmd, { cwd: workDir }, (venvErr, _stdout, venvStderr) => {
+                    if (venvErr) {
+                        console.error('NLP venv creation failed:', venvStderr || venvErr.message);
+                        return resolve({ success: false, error: venvStderr || venvErr.message });
                     }
+
+                    const installCmd = `"${venvPy}" -m pip install fastapi uvicorn click "spacy>=3.7.4" && "${venvPy}" -m spacy download en_core_web_sm`;
+                    exec(installCmd, { cwd: workDir }, (installErr, installStdout, installStderr) => {
+                        if (installErr) {
+                            console.error('NLP Setup pip install failed:', installStderr || installErr.message);
+                            resolve({ success: false, error: installStderr || installErr.message });
+                        } else {
+                            console.log('NLP Setup output:', installStdout);
+                            nlpServerManager.ensureStarted().catch(console.error);
+                            resolve({ success: true });
+                        }
+                    });
                 });
             });
         } catch (err: any) {

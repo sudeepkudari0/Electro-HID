@@ -13,20 +13,38 @@ function serverLog(...args: any[]) {
     console.log('[spaCy Server Manager]', ...args);
 }
 
-function resolveNlpScriptPath(): string {
+export function getNlpDir(): string {
     if (app.isPackaged) {
-        return path.join(process.resourcesPath, 'nlp', 'server.py');
+        return path.join(process.resourcesPath, 'nlp');
     }
     let basePath = app.getAppPath();
     if (basePath.includes('dist-electron')) {
         basePath = path.join(basePath, '..', '..');
     }
-    return path.join(basePath, 'native', 'nlp', 'server.py');
+    return path.join(basePath, 'native', 'nlp');
 }
 
-function findPythonExecutable(): string | null {
+export function getNlpVenvDir(): string {
+    if (app.isPackaged) {
+        return path.join(app.getPath('userData'), 'nlp', 'venv');
+    }
+    return path.join(getNlpDir(), '.venv');
+}
+
+export function getNlpVenvPython(): string {
+    const venvDir = getNlpVenvDir();
+    return process.platform === 'win32'
+        ? path.join(venvDir, 'Scripts', 'python.exe')
+        : path.join(venvDir, 'bin', 'python');
+}
+
+export function resolveNlpScriptPath(): string {
+    return path.join(getNlpDir(), 'server.py');
+}
+
+export function findPythonExecutable(): string | null {
     const candidates = process.platform === 'win32'
-        ? ['py -3', 'python', 'python3']
+        ? ['python', 'py', 'python3']
         : ['python3', 'python'];
 
     for (const cmd of candidates) {
@@ -59,9 +77,10 @@ class NlpServerManager {
             return false;
         }
 
-        const pythonCmd = findPythonExecutable();
+        const venvPy = getNlpVenvPython();
+        const pythonCmd = fs.existsSync(venvPy) ? venvPy : findPythonExecutable();
         if (!pythonCmd) {
-            serverLog('⚠ Python 3 not found on system path');
+            serverLog('⚠ Python 3 not found on system path or venv');
             return false;
         }
 
