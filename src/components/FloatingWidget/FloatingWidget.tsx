@@ -226,23 +226,31 @@ export function FloatingWidget({
                 className={`widget ${isLinux ? '' : 'pointer-events-auto'} ${isExpanded ? 'widget--expanded' : 'widget--collapsed'} ${isTeleprompterMode ? 'widget--teleprompter' : ''}`}
                 id="floating-widget"
                 style={{
-                    // Linux: widget fills its compact window, no CSS positioning
                     ...(isLinux ? {
                         position: 'relative',
                         top: 0,
                         right: 0,
-                        width: '100%',
-                        opacity: widgetOpacity / 100,
+                        opacity: isTeleprompterMode ? undefined : widgetOpacity / 100,
+                        ...(isTeleprompterMode ? {
+                            width: `${window.screen.width}px`,
+                            height: `${window.screen.height}px`,
+                        } : isExpanded ? {
+                            width: `${widgetSize.width}px`,
+                            height: widgetSize.height !== -1 ? `${widgetSize.height}px` : undefined,
+                            maxHeight: widgetSize.height !== -1 ? 'none' : `${Math.floor(window.screen.availHeight * 0.88)}px`,
+                        } : {
+                            width: '860px',
+                        }),
                     } : {
                         top: isTeleprompterMode ? 0 : `${widgetPos.top}px`,
                         right: isTeleprompterMode ? 0 : `${widgetPos.right}px`,
                         opacity: isTeleprompterMode ? undefined : widgetOpacity / 100,
+                        ...(isExpanded && !isTeleprompterMode ? {
+                            width: `${widgetSize.width}px`,
+                            height: widgetSize.height !== -1 ? `${widgetSize.height}px` : undefined,
+                            maxHeight: widgetSize.height !== -1 ? 'none' : undefined,
+                        } : {}),
                     }),
-                    ...(!isLinux && isExpanded && !isTeleprompterMode ? {
-                        width: `${widgetSize.width}px`,
-                        height: widgetSize.height !== -1 ? `${widgetSize.height}px` : undefined,
-                        maxHeight: widgetSize.height !== -1 ? 'none' : undefined,
-                    } : {}),
                 }}
             >
                 {/* Drag handle for teleprompter mode */}
