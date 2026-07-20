@@ -239,18 +239,24 @@ export function useMixedAudioRecorder(
             const settingsRes = await window.electronAPI.getSettings();
             const sttEngine = settingsRes.success && settingsRes.settings ? settingsRes.settings.sttEngine : 'moonshine';
             const mode = settingsRes.success && settingsRes.settings ? settingsRes.settings.sttMode : 'vad';
+            const micDeviceId = settingsRes.success && settingsRes.settings ? settingsRes.settings.micDeviceId : undefined;
             const useDeepgramStreaming = sttEngine === 'deepgram';
             
-            logger.info(`Starting audio recording (Engine: ${sttEngine}, Mode: ${useDeepgramStreaming ? 'deepgram-stream' : mode})...`);
+            logger.info(`Starting audio recording (Engine: ${sttEngine}, Mode: ${useDeepgramStreaming ? 'deepgram-stream' : mode}, Mic: ${micDeviceId || 'default'})...`);
             const assetBasePath = import.meta.env.BASE_URL || '/';
             
+            const audioConstraints: MediaTrackConstraints = {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true,
+                sampleRate: 16000,
+            };
+            if (micDeviceId && micDeviceId !== 'default') {
+                audioConstraints.deviceId = { exact: micDeviceId };
+            }
+
             const micStream = await navigator.mediaDevices.getUserMedia({
-                audio: {
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl: true,
-                    sampleRate: 16000,
-                },
+                audio: audioConstraints,
             });
             micStreamRef.current = micStream;
 

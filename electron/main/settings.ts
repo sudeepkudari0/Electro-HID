@@ -41,9 +41,10 @@ export interface AppSettings {
     applyLlmProvider: 'ollama' | 'openai' | 'gemini' | 'groq' | 'mistral';
     applyModel: string;
     autoAnswerConfidenceThreshold: number; // 0-1, questions above this confidence auto-generate answers
+    micDeviceId: string;
 }
 
-const CURRENT_VERSION = 20;
+const CURRENT_VERSION = 21;
 
 const DEFAULT_SETTINGS: AppSettings = {
     version: CURRENT_VERSION,
@@ -84,6 +85,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     applyLlmProvider: 'openai',
     applyModel: 'gpt-4o-mini',
     autoAnswerConfidenceThreshold: 0.8,
+    micDeviceId: 'default',
 };
 
 // Migration map: version number -> transform function
@@ -264,6 +266,14 @@ const MIGRATIONS: Record<number, (settings: any) => any> = {
             version: 20,
         };
     },
+    20: (settings: any) => {
+        // v20 -> v21: Add microphone device selection setting
+        return {
+            ...settings,
+            micDeviceId: settings.micDeviceId || 'default',
+            version: 21,
+        };
+    },
 };
 
 let settingsCache: AppSettings | null = null;
@@ -305,10 +315,10 @@ export function getSettings(): AppSettings {
     try {
         const data = fs.readFileSync(settingsPath, 'utf-8');
         const parsed = JSON.parse(data);
-        
+
         // Run migrations if needed
         const newSettings = runMigrations(parsed);
-        
+
         // Save if migrations occurred
         if (!parsed.version || parsed.version < CURRENT_VERSION) {
             fs.writeFileSync(settingsPath, JSON.stringify(newSettings, null, 2), 'utf-8');
@@ -327,7 +337,7 @@ export function getSettings(): AppSettings {
 export function saveSettings(settings: Partial<AppSettings>): AppSettings {
     const current = getSettings();
     const updated = { ...current, ...settings, version: CURRENT_VERSION };
-    
+
     try {
         const settingsPath = getSettingsPath();
         fs.writeFileSync(settingsPath, JSON.stringify(updated, null, 2), 'utf-8');
@@ -335,6 +345,6 @@ export function saveSettings(settings: Partial<AppSettings>): AppSettings {
     } catch (error) {
         console.error('Failed to save settings.json:', error);
     }
-    
+
     return updated;
 }

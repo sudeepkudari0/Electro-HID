@@ -56,10 +56,17 @@ app.commandLine.appendSwitch("enable-speech-dispatcher");
 let dashboardWindow: BrowserWindow | null = null;
 let overlayWindow: BrowserWindow | null = null;
 
+import { nlpServerManager } from "./nlp/server-manager";
+
 // Initialize app
 app.whenReady().then(() => {
   // Register IPC handlers before creating window
   registerIPCHandlers();
+
+  // Start standalone spaCy NLP server in background
+  nlpServerManager.ensureStarted().catch((err) => {
+    console.warn("[spaCy] Server startup warning:", err);
+  });
 
   // ── Window switching IPC ──
   ipcMain.handle("window:switch-interview", async () => {
@@ -125,9 +132,10 @@ app.on("will-quit", () => {
   globalShortcut.unregisterAll();
 });
 
-// Handle app closing — kill the whisper-server background process
+// Handle app closing — kill background processes
 app.on("before-quit", async () => {
   try {
+    nlpServerManager.stopServer();
     const { getTranscriber } = await import("./whisper/transcriber");
     const transcriber = getTranscriber();
     await transcriber.dispose();

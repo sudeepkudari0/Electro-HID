@@ -59,7 +59,8 @@ export function SettingsPanel({ onClose, onSettingsChanged }: SettingsPanelProps
         tailorLlmProvider: 'gemini' as 'ollama' | 'openai' | 'gemini' | 'groq' | 'mistral',
         tailorModel: 'gemini-2.0-flash',
         applyLlmProvider: 'openai' as 'ollama' | 'openai' | 'gemini' | 'groq' | 'mistral',
-        applyModel: 'gpt-4o-mini'
+        applyModel: 'gpt-4o-mini',
+        micDeviceId: 'default'
     });
     const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
     const [isTesting, setIsTesting] = useState(false);
@@ -73,6 +74,7 @@ export function SettingsPanel({ onClose, onSettingsChanged }: SettingsPanelProps
     const [selectedDownload, setSelectedDownload] = useState('base.en');
     const [selectedMoonshineDownload, setSelectedMoonshineDownload] = useState('MEDIUM_STREAMING');
     const [serverStatus, setServerStatus] = useState<{ exists: boolean; error?: string } | null>(null);
+    const [audioDevices, setAudioDevices] = useState<MediaDeviceInfo[]>([]);
 
     const [isSettingUpNLP, setIsSettingUpNLP] = useState(false);
     const [nlpSetupStatus, setNlpSetupStatus] = useState<string | null>(null);
@@ -85,6 +87,9 @@ export function SettingsPanel({ onClose, onSettingsChanged }: SettingsPanelProps
 
     useEffect(() => {
         loadData();
+        navigator.mediaDevices.enumerateDevices()
+            .then(devices => setAudioDevices(devices.filter(d => d.kind === 'audioinput')))
+            .catch(console.error);
     }, []);
 
     // Auto-save settings whenever they change (debounced)
@@ -310,7 +315,8 @@ export function SettingsPanel({ onClose, onSettingsChanged }: SettingsPanelProps
                     tailorLlmProvider: s.tailorLlmProvider || 'gemini',
                     tailorModel: s.tailorModel || 'gemini-2.0-flash',
                     applyLlmProvider: s.applyLlmProvider || 'openai',
-                    applyModel: s.applyModel || 'gpt-4o-mini'
+                    applyModel: s.applyModel || 'gpt-4o-mini',
+                    micDeviceId: s.micDeviceId || 'default'
                 });
 
                 // Fetch cloud models silently with loaded keys
@@ -635,6 +641,27 @@ export function SettingsPanel({ onClose, onSettingsChanged }: SettingsPanelProps
                                         </p>
                                     </div>
                                 )}
+                            </div>
+
+                            <div className="pt-4 border-t border-zinc-800">
+                                <label className="block text-sm font-medium text-zinc-300 mb-1">
+                                    Microphone Device
+                                </label>
+                                <select
+                                    value={settings.micDeviceId}
+                                    onChange={(e) => setSettings({ ...settings, micDeviceId: e.target.value })}
+                                    className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                >
+                                    <option value="default">Default System Microphone</option>
+                                    {audioDevices.map((device) => (
+                                        <option key={device.deviceId} value={device.deviceId}>
+                                            {device.label || `Microphone (${device.deviceId.slice(0, 8)}...)`}
+                                        </option>
+                                    ))}
+                                </select>
+                                <p className="mt-2 text-xs text-zinc-500">
+                                    Select the specific microphone you speak into during interviews.
+                                </p>
                             </div>
 
                             {settings.sttEngine === 'whisper' && (

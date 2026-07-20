@@ -8,7 +8,6 @@ import {
 } from "./hooks/useMixedAudioRecorder";
 import { useLLM } from "./hooks/useLLM";
 import { useProfile } from "./hooks/useProfile";
-import { addCandidateQuestion, setCandidateStatus, updateCandidateAnswer } from "./store/candidates";
 import { isQuestion } from "./lib/question-detector";
 import { classifyQuestion } from "./lib/interview-classifier";
 import { analyzeDelivery } from "./lib/delivery-analyzer";
@@ -332,66 +331,66 @@ function App(): JSX.Element {
       window.electronAPI.deepgram.onTranscript((data: any) => {
         const text = data.text;
         const source = data.speaker as "user" | "interviewer";
-        
+
         // Cross-channel echo suppression.
         // We only record the user's voice. We DO NOT record the interviewer's voice 
         // into the echo suppressor because Deepgram's interim updates would match 
         // themselves (same-channel) and suppress the rest of the sentence.
         if (source === "user") {
-            echoSuppressorRef.current.recordUserTranscription(text);
+          echoSuppressorRef.current.recordUserTranscription(text);
         } else if (source === "interviewer") {
-            if (echoSuppressorRef.current.isEcho(text)) {
-                return; // Skip echo (it matched the user's mic)
-            }
+          if (echoSuppressorRef.current.isEcho(text)) {
+            return; // Skip echo (it matched the user's mic)
+          }
         }
 
         setConversation((prev: ChatBlock[]) => {
-            const newConv = [...prev];
-            const lastBlock =
+          const newConv = [...prev];
+          const lastBlock =
             newConv.length > 0 ? newConv[newConv.length - 1] : null;
 
-            if (!lastBlock || lastBlock.speaker !== source) {
-                // Speaker changed or first block: reset final text for this source
-                deepgramFinalTextRef.current[source] = "";
-                const fullText = text;
-                
-                newConv.push({
-                    id: Date.now().toString() + Math.random().toString(),
-                    speaker: source,
-                    text: fullText,
-                    timestamp: new Date(),
-                });
+          if (!lastBlock || lastBlock.speaker !== source) {
+            // Speaker changed or first block: reset final text for this source
+            deepgramFinalTextRef.current[source] = "";
+            const fullText = text;
 
-                if (data.isFinal) {
-                    deepgramFinalTextRef.current[source] = fullText;
-                }
-            } else {
-                // Same speaker: append current interim/final to previously finalized text
-                const previouslyFinalized = deepgramFinalTextRef.current[source];
-                const fullText = previouslyFinalized + (previouslyFinalized && text ? " " : "") + text;
-                
-                newConv[newConv.length - 1] = { ...lastBlock, text: fullText };
+            newConv.push({
+              id: Date.now().toString() + Math.random().toString(),
+              speaker: source,
+              text: fullText,
+              timestamp: new Date(),
+            });
 
-                if (data.isFinal) {
-                    deepgramFinalTextRef.current[source] = fullText;
-                }
+            if (data.isFinal) {
+              deepgramFinalTextRef.current[source] = fullText;
             }
+          } else {
+            // Same speaker: append current interim/final to previously finalized text
+            const previouslyFinalized = deepgramFinalTextRef.current[source];
+            const fullText = previouslyFinalized + (previouslyFinalized && text ? " " : "") + text;
 
-            conversationRef.current = newConv;
+            newConv[newConv.length - 1] = { ...lastBlock, text: fullText };
 
-            if (source === "user" && autoDetectTimeoutRef.current) {
-                clearTimeout(autoDetectTimeoutRef.current);
-                autoDetectTimeoutRef.current = null;
+            if (data.isFinal) {
+              deepgramFinalTextRef.current[source] = fullText;
             }
+          }
 
-            if (source === "interviewer" && autoDetectTimeoutRef.current) {
-                console.log("[Detection] New interviewer text arrived — resetting detection window");
-                clearTimeout(autoDetectTimeoutRef.current);
-                autoDetectTimeoutRef.current = null;
-                startDetectionWindow();
-            }
+          conversationRef.current = newConv;
 
-            return newConv;
+          if (source === "user" && autoDetectTimeoutRef.current) {
+            clearTimeout(autoDetectTimeoutRef.current);
+            autoDetectTimeoutRef.current = null;
+          }
+
+          if (source === "interviewer" && autoDetectTimeoutRef.current) {
+            console.log("[Detection] New interviewer text arrived — resetting detection window");
+            clearTimeout(autoDetectTimeoutRef.current);
+            autoDetectTimeoutRef.current = null;
+            startDetectionWindow();
+          }
+
+          return newConv;
         });
       })
     );
@@ -441,11 +440,17 @@ function App(): JSX.Element {
     };
   }
 
+  // Telemetry refs for latency tracking
+  const speechStartPerfRef = useRef<number | null>(null);
+  const speechEndPerfRef = useRef<number | null>(null);
+  const speechStartTimeStrRef = useRef<string | null>(null);
+  const speechEndTimeStrRef = useRef<string | null>(null);
+
   // Active speculative LLM generation abort controller
   const activeAutoAnswerAbortControllerRef = useRef<AbortController | null>(null);
 
   // ─── Detection Window ───
-  const DETECTION_WINDOW_MS = 1500;
+  const DETECTION_WINDOW_MS = 250;
 
   const startDetectionWindow = useCallback(() => {
     // 3s cooldown between detections to avoid flooding the candidates list
@@ -462,16 +467,42 @@ function App(): JSX.Element {
         .find((b) => b.speaker === "interviewer");
       if (!lastInterviewerBlock || !lastInterviewerBlock.text.trim()) return;
 
-      const detection = await isQuestion(lastInterviewerBlock.text);
+      const speechStartPerf = speechStartPerfRef.current;
+      const speechEndPerf = speechEndPerfRef.current;
+      const speechStartTimeStr = speechStartTimeStrRef.current;
+      const speechEndTimeStr = speechEndTimeStrRef.current;
 
-      console.log(
-        `[Detection] "${lastInterviewerBlock.text.slice(0, 80)}..." => ` +
-          `isQuestion=${detection.isQuestion}, confidence=${detection.confidence.toFixed(2)}, ` +
-          `signals=[${detection.signals.join(", ")}], complete=${detection.syntacticallyComplete}`,
+      const evalStartTime = performance.now();
+      const detection = await isQuestion(lastInterviewerBlock.text);
+      const totalEvalMs = performance.now() - evalStartTime;
+
+      const speechDurationMs = (speechStartPerf && speechEndPerf)
+        ? (speechEndPerf - speechStartPerf)
+        : null;
+      const vadSilenceDelayMs = speechEndPerf
+        ? (evalStartTime - speechEndPerf)
+        : null;
+
+      const heuristicStr = `${detection.latencyMs?.heuristic.toFixed(2)}ms`;
+      const nlpGateStr = detection.latencyMs?.nlpGate !== undefined
+        ? `${detection.latencyMs.nlpGate.toFixed(2)}ms`
+        : 'N/A (offline/skipped)';
+
+      const isPassed = detection.isQuestion && detection.syntacticallyComplete;
+      console.groupCollapsed(
+        `[Question Detection] ${isPassed ? '✅ QUESTION DETECTED' : '❌ NOT DETECTED'} (${totalEvalMs.toFixed(1)}ms)`
       );
+      console.log(`Utterance: "${lastInterviewerBlock.text}"`);
+      console.log(
+        `Score: ${detection.score} (Threshold: 25) | Confidence: ${(detection.confidence * 100).toFixed(0)}% | Complete: ${detection.syntacticallyComplete ? 'Yes ✅' : 'No ❌'}`
+      );
+      console.log(`Signals: [${detection.signals.join(', ') || 'none'}]`);
+      console.log(`Speech Timestamps: Started=${speechStartTimeStr || 'N/A'} | Ended=${speechEndTimeStr || 'N/A'} | Duration=${speechDurationMs ? `${speechDurationMs.toFixed(0)}ms` : 'N/A'}`);
+      console.log(`VAD Silence Delay: ${vadSilenceDelayMs ? `${vadSilenceDelayMs.toFixed(0)}ms` : 'N/A'} (Speech Stop ➔ Detection Trigger)`);
+      console.log(`Latency Breakdown: Heuristic=${heuristicStr} | spaCy NLP=${nlpGateStr} | Total=${totalEvalMs.toFixed(2)}ms`);
 
       // Only proceed if it is syntactically complete (Tier 1 Gate passed)
-      if (detection.isQuestion && detection.syntacticallyComplete) {
+      if (isPassed) {
         lastDetectionTimeRef.current = Date.now();
         // Add to candidates list — deduplication happens inside the store
         const candidateId = addCandidateQuestion(
@@ -480,23 +511,43 @@ function App(): JSX.Element {
           detection.signals,
         );
 
-        // Auto-generate answer for high-confidence questions
-        if (candidateId && detection.confidence >= autoAnswerConfidenceThresholdRef.current) {
-            console.log(`[Detection] Auto-generating answer speculatively for ${candidateId}`);
+        if (candidateId) {
+          console.log(`Action: Candidate Question Added (ID: ${candidateId})`);
+          // Auto-generate answer for high-confidence questions
+          if (detection.confidence >= autoAnswerConfidenceThresholdRef.current) {
+            console.log(`Action: Triggering speculative LLM answer (Confidence ${detection.confidence.toFixed(2)} >= ${autoAnswerConfidenceThresholdRef.current})`);
             const controller = new AbortController();
             activeAutoAnswerAbortControllerRef.current = controller;
-            handlePickQuestionRef.current(candidateId, lastInterviewerBlock.text, controller.signal).finally(() => {
-                if (activeAutoAnswerAbortControllerRef.current === controller) {
-                    activeAutoAnswerAbortControllerRef.current = null;
-                }
+
+            const telemetryMeta = {
+              speechStartPerf,
+              speechEndPerf,
+              speechStartTimeStr,
+              speechEndTimeStr,
+              speechDurationMs,
+              vadSilenceDelayMs,
+              detectionEvalMs: totalEvalMs,
+              detectionResult: detection,
+            };
+
+            handlePickQuestionRef.current(candidateId, lastInterviewerBlock.text, controller.signal, telemetryMeta).finally(() => {
+              if (activeAutoAnswerAbortControllerRef.current === controller) {
+                activeAutoAnswerAbortControllerRef.current = null;
+              }
             });
+          }
+        } else {
+          console.log(`Action: Candidate question ignored (Duplicate detected in store)`);
         }
       }
+      console.groupEnd();
     }, DETECTION_WINDOW_MS);
   }, [autoDetectionEnabled, addCandidateQuestion]);
 
   // Called when interviewer's VAD detects speech-end
   const handleInterviewerSpeechEnd = useCallback(() => {
+    speechEndPerfRef.current = performance.now();
+    speechEndTimeStrRef.current = new Date().toLocaleTimeString();
     console.log(
       "[Detection] Interviewer speech ended — starting detection window",
     );
@@ -509,6 +560,8 @@ function App(): JSX.Element {
 
   // Called when interviewer's VAD detects speech-start (resumed speaking)
   const handleInterviewerSpeechStart = useCallback(() => {
+    speechStartPerfRef.current = performance.now();
+    speechStartTimeStrRef.current = new Date().toLocaleTimeString();
     if (autoDetectTimeoutRef.current) {
       console.log(
         "[Detection] Interviewer resumed speaking — cancelling detection window",
@@ -516,12 +569,12 @@ function App(): JSX.Element {
       clearTimeout(autoDetectTimeoutRef.current);
       autoDetectTimeoutRef.current = null;
     }
-    
+
     // Tier 2: Speculative cancellation
     if (activeAutoAnswerAbortControllerRef.current) {
-        console.log("[Detection] Interviewer resumed speaking — ABORTING speculative LLM generation!");
-        activeAutoAnswerAbortControllerRef.current.abort();
-        activeAutoAnswerAbortControllerRef.current = null;
+      console.log("[Detection] Interviewer resumed speaking — ABORTING speculative LLM generation!");
+      activeAutoAnswerAbortControllerRef.current.abort();
+      activeAutoAnswerAbortControllerRef.current = null;
     }
   }, []);
 
@@ -545,7 +598,17 @@ function App(): JSX.Element {
   const handlePickQuestion = async (
     candidateId: string,
     _questionText: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    telemetryMeta?: {
+      speechStartPerf: number | null;
+      speechEndPerf: number | null;
+      speechStartTimeStr: string | null;
+      speechEndTimeStr: string | null;
+      speechDurationMs: number | null;
+      vadSilenceDelayMs: number | null;
+      detectionEvalMs: number;
+      detectionResult: any;
+    }
   ) => {
     // Mark the candidate as "answering"
     setCandidateStatus(candidateId, "answering");
@@ -567,6 +630,9 @@ function App(): JSX.Element {
       interviewType = detected;
     }
 
+    const llmReqStartTime = performance.now();
+    let firstTokenTime: number | null = null;
+
     try {
       let streamedAnswer = "";
 
@@ -581,6 +647,32 @@ function App(): JSX.Element {
           useBulletPoints,
         },
         (chunk) => {
+          if (!firstTokenTime) {
+            firstTokenTime = performance.now();
+            const ttftMs = firstTokenTime - llmReqStartTime;
+            const e2eMs = (telemetryMeta?.speechEndPerf)
+              ? (firstTokenTime - telemetryMeta.speechEndPerf)
+              : (firstTokenTime - llmReqStartTime);
+
+            console.groupCollapsed(
+              `[Pipeline Telemetry] ⚡ AI Stream Started (TTFT: ${ttftMs.toFixed(0)}ms | Total E2E: ${e2eMs.toFixed(0)}ms)`
+            );
+            console.log(`Utterance: "${_questionText}"`);
+            if (telemetryMeta) {
+              console.log(`🎙️ Speech Metrics:`);
+              console.log(`   Started: ${telemetryMeta.speechStartTimeStr || 'N/A'} | Ended: ${telemetryMeta.speechEndTimeStr || 'N/A'}`);
+              console.log(`   Speech Duration: ${telemetryMeta.speechDurationMs !== null ? `${telemetryMeta.speechDurationMs.toFixed(0)}ms` : 'N/A'}`);
+              console.log(`   VAD Silence Delay: ${telemetryMeta.vadSilenceDelayMs !== null ? `${telemetryMeta.vadSilenceDelayMs.toFixed(0)}ms` : 'N/A'} (Speech Stop ➔ Detection Trigger)`);
+              console.log(`🔍 Detection Timings:`);
+              console.log(`   Detection Score: ${telemetryMeta.detectionResult?.score} | Signals: [${telemetryMeta.detectionResult?.signals?.join(', ') || 'none'}]`);
+              console.log(`   Detector Latency: Heuristic=${telemetryMeta.detectionResult?.latencyMs?.heuristic?.toFixed(2)}ms | spaCy NLP=${telemetryMeta.detectionResult?.latencyMs?.nlpGate?.toFixed(2) || 'N/A'}ms | Total=${telemetryMeta.detectionEvalMs.toFixed(2)}ms`);
+            }
+            console.log(`🤖 AI Streaming Metrics:`);
+            console.log(`   LLM Time-To-First-Token (TTFT): ${ttftMs.toFixed(1)}ms`);
+            console.log(`   ⚡ Total E2E (Speech Stop ➔ AI Stream Started): ${e2eMs.toFixed(1)}ms`);
+            console.groupEnd();
+          }
+
           streamedAnswer += chunk;
           updateCandidateAnswer(candidateId, {
             answer: streamedAnswer,
@@ -597,14 +689,14 @@ function App(): JSX.Element {
       });
     } catch (error: any) {
       if (error?.message === 'AbortError') {
-          console.log(`[Detection] Answer generation for ${candidateId} was successfully aborted.`);
-          // Clear the UI so it doesn't look broken
-          updateCandidateAnswer(candidateId, {
-              answer: "Cancelled (Interviewer continued speaking...)",
-              isStreaming: false,
-              status: "answered"
-          });
-          return;
+        console.log(`[Detection] Answer generation for ${candidateId} was successfully aborted.`);
+        // Clear the UI so it doesn't look broken
+        updateCandidateAnswer(candidateId, {
+          answer: "Cancelled (Interviewer continued speaking...)",
+          isStreaming: false,
+          status: "answered"
+        });
+        return;
       }
       console.error("Failed to generate answer:", error);
       updateCandidateAnswer(candidateId, {
@@ -870,9 +962,9 @@ function App(): JSX.Element {
     try {
       const prompt = isCodeMode
         ? getCodeAnalysisPrompt({
-            resume: profile.resume,
-            jobDescription: profile.jobDescription,
-          })
+          resume: profile.resume,
+          jobDescription: profile.jobDescription,
+        })
         : undefined;
 
       const newAnswer: Answer = {
@@ -919,24 +1011,24 @@ function App(): JSX.Element {
     <>
       <FloatingWidget
         isExpanded={isExpanded}
-          isChatOpen={isChatOpen}
-          isHistoryOpen={isHistoryOpen}
-          isPracticeOpen={isPracticeOpen}
-          isRecording={isRecording}
-          isCapturing={isCapturing}
-          isGenerating={isGenerating}
-          isTeleprompterMode={isTeleprompterMode}
-          sessionTime={sessionTime}
-          conversation={conversation}
-          isModelLoading={isModelLoading}
-          modelError={modelError}
-          candidateQuestions={candidateQuestions}
-          detectedQuestions={detectedQuestions}
-          expandedQuestionId={expandedQuestionId}
-          autoDetectionEnabled={autoDetectionEnabled}
-          sttEngine={sttEngine}
-          sttModel={sttModel}
-          audioLevels={audioLevels}
+        isChatOpen={isChatOpen}
+        isHistoryOpen={isHistoryOpen}
+        isPracticeOpen={isPracticeOpen}
+        isRecording={isRecording}
+        isCapturing={isCapturing}
+        isGenerating={isGenerating}
+        isTeleprompterMode={isTeleprompterMode}
+        sessionTime={sessionTime}
+        conversation={conversation}
+        isModelLoading={isModelLoading}
+        modelError={modelError}
+        candidateQuestions={candidateQuestions}
+        detectedQuestions={detectedQuestions}
+        expandedQuestionId={expandedQuestionId}
+        autoDetectionEnabled={autoDetectionEnabled}
+        sttEngine={sttEngine}
+        sttModel={sttModel}
+        audioLevels={audioLevels}
         onToggleExpanded={toggleExpanded}
         onToggleRecording={handleToggleRecording}
         onCaptureScreen={handleCaptureScreen}
@@ -949,7 +1041,7 @@ function App(): JSX.Element {
         onClose={handleClose}
         onPickQuestion={handlePickQuestion}
         onDismissCandidate={removeCandidateQuestion}
-        onSelectOption={() => {}}
+        onSelectOption={() => { }}
         onClearDetectedQuestions={handleClearAll}
         onToggleAutoDetection={handleToggleAutoDetection}
       />

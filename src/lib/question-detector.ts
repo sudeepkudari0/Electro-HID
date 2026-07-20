@@ -11,8 +11,14 @@ export type DetectionMode = 'regex' | 'llm' | 'hybrid' | 'heuristic';
 export interface DetectionResult {
     isQuestion: boolean;
     confidence: number;
+    score: number;
     signals: string[]; // which signals contributed
     syntacticallyComplete?: boolean;
+    latencyMs?: {
+        heuristic: number;
+        nlpGate?: number;
+        total: number;
+    };
 }
 
 // ─── Signal 1: Question mark ───
@@ -101,11 +107,19 @@ export async function isQuestion(
     _mode: DetectionMode = 'heuristic',
     skipNlp: boolean = false
 ): Promise<DetectionResult> {
+    const tStart = performance.now();
     const trimmed = text.trim();
     if (!trimmed || trimmed.length < 5) {
-        return { isQuestion: false, confidence: 0, signals: [] };
+        return {
+            isQuestion: false,
+            confidence: 0,
+            score: 0,
+            signals: [],
+            latencyMs: { heuristic: performance.now() - tStart, total: performance.now() - tStart }
+        };
     }
 
+    const tHeuristicStart = performance.now();
     const signals: { name: string; score: number }[] = [
         { name: 'question_mark', score: checkQuestionMark(trimmed) },
         { name: 'interrogative_open', score: checkInterrogativeOpening(trimmed) },
@@ -123,36 +137,48 @@ export async function isQuestion(
 
     let isQ = totalScore >= QUESTION_THRESHOLD;
     const confidence = Math.min(Math.max(totalScore / 60, 0), 1.0);
-    
+    const heuristicMs = performance.now() - tHeuristicStart;
+
     let syntacticallyComplete = true;
+    let nlpGateMs: number | undefined = undefined;
 
     // Call Tier 1 Gate (Python sidecar) if it looks like a question
     if (isQ && !skipNlp) {
+        const tNlpStart = performance.now();
         try {
-            const res = await fetch('http://127.0.0.1:8178/nlp/check-completeness', {
+            const res = await fetch('http://127.0.0.1:8179/nlp/check-completeness', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text: trimmed })
+                body: JSON.stringify({ text: trimmed }),
+                signal: AbortSignal.timeout(300) // 300ms timeout max for fast local response
             });
+            nlpGateMs = performance.now() - tNlpStart;
             if (res.ok) {
                 const data = await res.json();
                 syntacticallyComplete = data.is_complete;
                 if (!syntacticallyComplete) {
                     console.log(`[NLP Gate] Fragment detected: "${trimmed}" Reason: ${data.reason}`);
-                    // We don't necessarily clear isQ here, but we pass the flag
-                    // so the caller can decide whether to speculatively fire.
                 }
             }
         } catch (err) {
-            console.warn('[NLP Gate] Failed to connect to Python sidecar, skipping syntactic check.', err);
+            nlpGateMs = performance.now() - tNlpStart;
+            // Connection failed or timed out — fallback gracefully to heuristic
         }
     }
+
+    const totalMs = performance.now() - tStart;
 
     return {
         isQuestion: isQ,
         confidence,
+        score: totalScore,
         signals: activeSignals,
         syntacticallyComplete,
+        latencyMs: {
+            heuristic: heuristicMs,
+            nlpGate: nlpGateMs,
+            total: totalMs,
+        }
     };
 }
 
@@ -160,9 +186,16 @@ export async function isQuestion(
  * Synchronous version for use in event callbacks where async isn't needed.
  */
 export function isQuestionSync(text: string): DetectionResult {
+    const tStart = performance.now();
     const trimmed = text.trim();
     if (!trimmed || trimmed.length < 5) {
-        return { isQuestion: false, confidence: 0, signals: [] };
+        return {
+            isQuestion: false,
+            confidence: 0,
+            score: 0,
+            signals: [],
+            latencyMs: { heuristic: 0, total: 0 }
+        };
     }
 
     const signals: { name: string; score: number }[] = [
@@ -179,10 +212,16 @@ export function isQuestionSync(text: string): DetectionResult {
 
     const totalScore = signals.reduce((sum, s) => sum + s.score, 0);
     const activeSignals = signals.filter(s => s.score > 0).map(s => s.name);
+    const duration = performance.now() - tStart;
 
     return {
         isQuestion: totalScore >= QUESTION_THRESHOLD,
         confidence: Math.min(Math.max(totalScore / 60, 0), 1.0),
+        score: totalScore,
         signals: activeSignals,
+        latencyMs: {
+            heuristic: duration,
+            total: duration,
+        }
     };
 }
