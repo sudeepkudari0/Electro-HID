@@ -50,11 +50,10 @@
   "build": {
     "appId": "com.synapse.ai",
     "productName": "Synapse AI",
-    "asar": false,
+    "asar": true,
     "files": [
       "dist/**/*",
       "dist-electron/**/*",
-      "node_modules/**/*",
       "package.json"
     ],
     "extraResources": [
