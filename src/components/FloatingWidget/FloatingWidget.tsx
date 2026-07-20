@@ -99,16 +99,23 @@ export function FloatingWidget({
     const prevCandidateCount = useRef(candidateQuestions.length);
     const [selectedSession, setSelectedSession] = useState<any>(null);
     const widgetOpacity = useUIStore((state) => state.widgetOpacity);
+    const isLinux = window.electronAPI?.platform === 'linux';
 
-    // ─── Widget CSS position (for drag) ───
+    // ─── Widget CSS position (for drag on macOS/Windows) ───
     const [widgetPos, setWidgetPos] = useState({ top: 16, right: 16 });
 
     const handleDrag = useCallback((deltaX: number, deltaY: number) => {
-        setWidgetPos(prev => ({
-            top: Math.max(0, prev.top + deltaY),
-            right: Math.max(0, prev.right - deltaX),
-        }));
-    }, []);
+        if (isLinux) {
+            // Linux: move the actual Electron window
+            window.electronAPI?.moveWindow(deltaX, deltaY);
+        } else {
+            // macOS/Windows: CSS reposition within the full-screen overlay
+            setWidgetPos(prev => ({
+                top: Math.max(0, prev.top + deltaY),
+                right: Math.max(0, prev.right - deltaX),
+            }));
+        }
+    }, [isLinux]);
 
     // ─── Widget Size (for resize) ───
     const [widgetSize, setWidgetSize] = useState({ width: 860, height: -1 });
@@ -144,12 +151,31 @@ export function FloatingWidget({
         }
     };
 
-    // ─── Click-through management ───
-    // NOTE: On Linux, setIgnoreMouseEvents({ forward: true }) is not supported,
-    // so we skip click-through toggling entirely. The overlay stays interactive.
+    // ─── Linux: Sync widget dimensions to Electron window ───
     useEffect(() => {
-        const isLinux = window.electronAPI?.platform === 'linux';
-        if (isLinux) return; // No click-through on Linux
+        if (!isLinux) return;
+        const el = widgetRef.current;
+        if (!el) return;
+
+        const observer = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                const { width, height } = entry.contentRect;
+                if (width > 0 && height > 0) {
+                    (window as any).electronAPI?.setWindowSize?.(
+                        Math.ceil(width) + 2, // +2 for border
+                        Math.ceil(height) + 2,
+                    );
+                }
+            }
+        });
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, [isLinux]);
+
+    // ─── Click-through management (macOS/Windows only) ───
+    // On Linux, the window only covers the widget area, so no click-through needed.
+    useEffect(() => {
+        if (isLinux) return;
 
         const el = widgetRef.current;
         if (!el) return;
@@ -175,7 +201,7 @@ export function FloatingWidget({
             el.removeEventListener('mouseenter', handleEnter);
             el.removeEventListener('mouseleave', handleLeave);
         };
-    }, [isTeleprompterMode]);
+    }, [isTeleprompterMode, isLinux]);
 
     // Auto-expand when new candidate questions arrive
     useEffect(() => {
@@ -194,20 +220,29 @@ export function FloatingWidget({
     };
 
     return (
-        <div className="fixed top-0 right-0 w-full h-full pointer-events-none select-none z-50">
+        <div className={`fixed top-0 right-0 w-full h-full select-none z-50 ${isLinux ? '' : 'pointer-events-none'}`}>
             <div
                 ref={widgetRef}
-                className={`widget pointer-events-auto ${isExpanded ? 'widget--expanded' : 'widget--collapsed'} ${isTeleprompterMode ? 'widget--teleprompter' : ''}`}
+                className={`widget ${isLinux ? '' : 'pointer-events-auto'} ${isExpanded ? 'widget--expanded' : 'widget--collapsed'} ${isTeleprompterMode ? 'widget--teleprompter' : ''}`}
                 id="floating-widget"
-                style={{ 
-                    top: isTeleprompterMode ? 0 : `${widgetPos.top}px`, 
-                    right: isTeleprompterMode ? 0 : `${widgetPos.right}px`,
-                    opacity: isTeleprompterMode ? undefined : widgetOpacity / 100,
-                    ...(isExpanded && !isTeleprompterMode ? {
+                style={{
+                    // Linux: widget fills its compact window, no CSS positioning
+                    ...(isLinux ? {
+                        position: 'relative',
+                        top: 0,
+                        right: 0,
+                        width: '100%',
+                        opacity: widgetOpacity / 100,
+                    } : {
+                        top: isTeleprompterMode ? 0 : `${widgetPos.top}px`,
+                        right: isTeleprompterMode ? 0 : `${widgetPos.right}px`,
+                        opacity: isTeleprompterMode ? undefined : widgetOpacity / 100,
+                    }),
+                    ...(!isLinux && isExpanded && !isTeleprompterMode ? {
                         width: `${widgetSize.width}px`,
                         height: widgetSize.height !== -1 ? `${widgetSize.height}px` : undefined,
                         maxHeight: widgetSize.height !== -1 ? 'none' : undefined,
-                    } : {})
+                    } : {}),
                 }}
             >
                 {/* Drag handle for teleprompter mode */}

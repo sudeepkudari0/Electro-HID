@@ -41,6 +41,10 @@ interface ElectronAPI {
     deltaX: number,
     deltaY: number,
   ) => Promise<{ success: boolean; error?: string }>;
+  setWindowSize: (
+    width: number,
+    height: number,
+  ) => Promise<{ success: boolean; error?: string }>;
   whisper: WhisperAPI;
   captureScreen: (
     sourceId?: string,

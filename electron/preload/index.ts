@@ -47,6 +47,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
         return await ipcRenderer.invoke(IPC_CHANNELS.MOVE_WINDOW, deltaX, deltaY);
     },
 
+    setWindowSize: async (width: number, height: number) => {
+        return await ipcRenderer.invoke('window:set-size', width, height);
+    },
+
     // Whisper API
     whisper: {
         loadModel: async (modelName: string = 'small.en') => {

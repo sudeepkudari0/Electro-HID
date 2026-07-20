@@ -107,28 +107,40 @@ export function createDashboardWindow(): BrowserWindow {
 }
 
 /**
- * Overlay Window — Full-screen transparent overlay for Interview Assistant.
- * Created ONLY when the user selects Interview Assistant from the Dashboard.
+ * Overlay Window — Interview Assistant window.
+ *
+ * macOS / Windows:
+ *   Full-screen transparent overlay with click-through (setIgnoreMouseEvents + forward).
+ *   The widget floats inside the overlay using CSS positioning.
+ *
+ * Linux:
+ *   Compact, non-transparent, always-on-top window.
+ *   The { forward: true } option for setIgnoreMouseEvents is NOT supported on Linux,
+ *   making the full-screen overlay approach impossible. Instead, the window matches
+ *   the widget bounds and is dynamically resized via IPC as the widget changes.
  */
 export function createOverlayWindow(): BrowserWindow {
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width: screenWidth, height: screenHeight } =
     primaryDisplay.workAreaSize;
 
+  const isLinux = process.platform === "linux";
+  const isTest = process.env.NODE_ENV === "test";
+
   const overlayWindow = new BrowserWindow({
-    width: screenWidth,
-    height: screenHeight,
-    x: 0,
-    y: 0,
+    width: isLinux ? 860 : screenWidth,
+    height: isLinux ? 48 : screenHeight,
+    x: isLinux ? screenWidth - 876 : 0,
+    y: isLinux ? 16 : 0,
     frame: false,
-    transparent: process.env.NODE_ENV !== "test",
+    transparent: isLinux ? false : !isTest,
     alwaysOnTop: true,
-    skipTaskbar: process.env.NODE_ENV !== "test",
-    resizable: false,
-    backgroundColor: process.env.NODE_ENV === "test" ? "#1a1a1a" : "#00000000",
+    skipTaskbar: isLinux ? false : !isTest,
+    resizable: isLinux,
+    backgroundColor: isLinux ? "#0c0e14" : (isTest ? "#1a1a1a" : "#00000000"),
     show: false,
     focusable: true,
-    hasShadow: false,
+    hasShadow: isLinux,
     icon: resolveIcon(),
     webPreferences: {
       preload: path.join(__dirname, "../preload/index.cjs"),
@@ -146,10 +158,9 @@ export function createOverlayWindow(): BrowserWindow {
 
   overlayWindow.once("ready-to-show", () => {
     overlayWindow.show();
-    // Enable click-through — transparent areas pass clicks to underlying apps.
-    // NOTE: The { forward: true } option is NOT supported on Linux.
-    // On Linux, the window stays interactive (no click-through) as a fallback.
-    if (process.platform !== "linux") {
+
+    if (!isLinux) {
+      // macOS/Windows: enable click-through with event forwarding
       overlayWindow.setIgnoreMouseEvents(true, { forward: true });
     }
 

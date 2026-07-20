@@ -531,6 +531,20 @@ export function registerIPCHandlers(): void {
         }
     });
 
+    // Window: Resize window (used on Linux to sync window to widget size)
+    ipcMain.handle('window:set-size', async (event, width: number, height: number) => {
+        try {
+            const window = BrowserWindow.fromWebContents(event.sender);
+            if (window) {
+                window.setSize(Math.round(width), Math.round(height), false);
+                return { success: true };
+            }
+            return { success: false, error: 'No window found' };
+        } catch (error) {
+            return { success: false, error: String(error) };
+        }
+    });
+
     // Screen: Capture screenshot
     ipcMain.handle(IPC_CHANNELS.CAPTURE_SCREEN, async (event, sourceId?: string) => {
         try {
