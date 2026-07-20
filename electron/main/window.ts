@@ -146,8 +146,12 @@ export function createOverlayWindow(): BrowserWindow {
 
   overlayWindow.once("ready-to-show", () => {
     overlayWindow.show();
-    // Enable click-through — transparent areas pass clicks to underlying apps
-    overlayWindow.setIgnoreMouseEvents(true, { forward: true });
+    // Enable click-through — transparent areas pass clicks to underlying apps.
+    // NOTE: The { forward: true } option is NOT supported on Linux.
+    // On Linux, the window stays interactive (no click-through) as a fallback.
+    if (process.platform !== "linux") {
+      overlayWindow.setIgnoreMouseEvents(true, { forward: true });
+    }
 
     setTimeout(() => {
       if (!overlayWindow.isDestroyed()) {

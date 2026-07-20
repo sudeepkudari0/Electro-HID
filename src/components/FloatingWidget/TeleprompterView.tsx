@@ -35,14 +35,16 @@ export function TeleprompterView({ candidateQuestions }: TeleprompterViewProps) 
         }
     };
 
+    const isLinux = window.electronAPI?.platform === 'linux';
+
     const handleMouseEnterControls = () => {
         setIsHoveringControls(true);
-        window.electronAPI?.setIgnoreMouseEvents(false);
+        if (!isLinux) window.electronAPI?.setIgnoreMouseEvents(false);
     };
 
     const handleMouseLeaveControls = () => {
         setIsHoveringControls(false);
-        window.electronAPI?.setIgnoreMouseEvents(true);
+        if (!isLinux) window.electronAPI?.setIgnoreMouseEvents(true);
     };
 
     if (!activeQuestion) {

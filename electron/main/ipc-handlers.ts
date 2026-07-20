@@ -447,16 +447,27 @@ export function registerIPCHandlers(): void {
     });
 
     // Window: Set ignore mouse events (for click-through behavior)
+    // NOTE: The { forward: true } option is NOT supported on Linux.
+    // On Linux, we skip click-through entirely so the overlay stays interactive.
     ipcMain.handle(IPC_CHANNELS.SET_IGNORE_MOUSE_EVENTS, async (event, ignore: boolean) => {
         try {
             const window = BrowserWindow.fromWebContents(event.sender);
             if (window) {
-                if (ignore) {
-                    // When ignoring, forward mouse events so renderer can detect mouseenter
-                    window.setIgnoreMouseEvents(true, { forward: true });
+                if (process.platform === 'linux') {
+                    // Linux: forward option not supported, so don't enable click-through.
+                    // Always keep the window interactive.
+                    if (!ignore) {
+                        window.setIgnoreMouseEvents(false);
+                    }
+                    // When ignore=true, do nothing on Linux (no-op)
                 } else {
-                    // When NOT ignoring, accept all mouse events normally
-                    window.setIgnoreMouseEvents(false);
+                    if (ignore) {
+                        // When ignoring, forward mouse events so renderer can detect mouseenter
+                        window.setIgnoreMouseEvents(true, { forward: true });
+                    } else {
+                        // When NOT ignoring, accept all mouse events normally
+                        window.setIgnoreMouseEvents(false);
+                    }
                 }
                 return { success: true };
             }

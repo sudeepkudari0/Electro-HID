@@ -145,7 +145,12 @@ export function FloatingWidget({
     };
 
     // ─── Click-through management ───
+    // NOTE: On Linux, setIgnoreMouseEvents({ forward: true }) is not supported,
+    // so we skip click-through toggling entirely. The overlay stays interactive.
     useEffect(() => {
+        const isLinux = window.electronAPI?.platform === 'linux';
+        if (isLinux) return; // No click-through on Linux
+
         const el = widgetRef.current;
         if (!el) return;
 

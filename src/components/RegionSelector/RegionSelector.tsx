@@ -20,7 +20,10 @@ export const RegionSelector: React.FC<RegionSelectorProps> = ({ onCapture, onCan
     const imgRef = useRef<HTMLImageElement | null>(null);
 
     // Disable click-through while region selector is active (full-screen overlay)
+    // On Linux, click-through is not used so skip this entirely
     useEffect(() => {
+        const isLinux = window.electronAPI?.platform === 'linux';
+        if (isLinux) return;
         window.electronAPI?.setIgnoreMouseEvents(false);
         return () => {
             window.electronAPI?.setIgnoreMouseEvents(true);

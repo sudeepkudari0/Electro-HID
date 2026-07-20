@@ -1,13 +1,29 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigationStore, type AppModule } from '../state/navigation-store';
 import { CareerHub } from './CareerHub/CareerHub';
 import { SettingsPanel } from '../components/SettingsPanel/SettingsPanel';
 import { InterviewPrepLanding } from './InterviewPrep/InterviewPrepLanding';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Minus, Square, X, Maximize2 } from 'lucide-react';
 
 export function Dashboard() {
   const { activeModule, setActiveModule } = useNavigationStore();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const isLinux = (window as any).electronAPI?.platform === 'linux';
+  const [isMaximized, setIsMaximized] = useState(false);
+
+  // Track window maximize state for Linux custom controls
+  useEffect(() => {
+    if (!isLinux) return;
+    // Check initial state
+    (window as any).electronAPI?.windowControl?.isMaximized?.().then((val: boolean) => {
+      setIsMaximized(val);
+    });
+    // Listen for state changes
+    const cleanup = (window as any).electronAPI?.windowControl?.onStateChanged?.((state: { isMaximized: boolean }) => {
+      setIsMaximized(state.isMaximized);
+    });
+    return () => cleanup?.();
+  }, [isLinux]);
 
 
 
@@ -102,8 +118,39 @@ export function Dashboard() {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 bg-[#0f1117] rounded-tl-2xl border-t border-l border-white/5 relative overflow-hidden select-text">
-        <div className="absolute inset-0 overflow-auto">
+      <div className="flex-1 bg-[#0f1117] rounded-tl-2xl border-t border-l border-white/5 relative overflow-hidden select-text flex flex-col">
+        {/* Linux: Custom window controls bar (since titleBarOverlay is not available) */}
+        {isLinux && (
+          <div
+            className="h-9 w-full flex-shrink-0 flex items-center justify-end px-1 bg-[#0f1117]"
+            style={{ WebkitAppRegion: 'drag' } as any}
+          >
+            <div className="flex items-center gap-0.5" style={{ WebkitAppRegion: 'no-drag' } as any}>
+              <button
+                onClick={() => (window as any).electronAPI?.windowControl?.minimize?.()}
+                className="w-[46px] h-8 flex items-center justify-center text-slate-400 hover:bg-white/10 hover:text-slate-200 transition-colors rounded-sm"
+                title="Minimize"
+              >
+                <Minus className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => (window as any).electronAPI?.windowControl?.maximize?.()}
+                className="w-[46px] h-8 flex items-center justify-center text-slate-400 hover:bg-white/10 hover:text-slate-200 transition-colors rounded-sm"
+                title={isMaximized ? 'Restore' : 'Maximize'}
+              >
+                {isMaximized ? <Maximize2 className="w-3.5 h-3.5" /> : <Square className="w-3.5 h-3.5" />}
+              </button>
+              <button
+                onClick={() => (window as any).electronAPI?.windowControl?.close?.()}
+                className="w-[46px] h-8 flex items-center justify-center text-slate-400 hover:bg-red-500/80 hover:text-white transition-colors rounded-sm"
+                title="Close"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+        <div className="absolute inset-0 overflow-auto" style={isLinux ? { top: '36px' } : undefined}>
           {activeModule === 'dashboard' && <OverviewPanel />}
           {activeModule === 'career-hub' && <CareerHub />}
           {activeModule === 'interview-prep' && <InterviewPrepLanding />}
