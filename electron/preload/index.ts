@@ -138,6 +138,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
         return await ipcRenderer.invoke('nlp:setup');
     },
 
+    nlpStatus: async () => {
+        return await ipcRenderer.invoke('nlp:status');
+    },
+
     // App control API
     quitApp: async () => {
         return await ipcRenderer.invoke(IPC_CHANNELS.QUIT_APP);

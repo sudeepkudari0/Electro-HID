@@ -80,6 +80,7 @@ interface ElectronAPI {
   }>;
   llmAbort: (requestId: string) => Promise<{ success: boolean; error?: string }>;
   nlpSetup: () => Promise<{ success: boolean; error?: string }>;
+  nlpStatus: () => Promise<{ installed: boolean; error?: string }>;
   quitApp: () => Promise<{ success: boolean; error?: string }>;
 
   getSettings: () => Promise<{

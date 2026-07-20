@@ -236,6 +236,37 @@ export function registerIPCHandlers(): void {
         return { success: false, error: 'Request not found' };
     });
 
+    ipcMain.handle('nlp:status', async () => {
+        try {
+            const { exec } = await import('child_process');
+            const path = await import('path');
+            const fs = await import('fs');
+            const moonshineDir = app.isPackaged 
+                ? path.join(process.resourcesPath, 'moonshine') 
+                : path.join(app.getAppPath(), 'native', 'moonshine');
+
+            const isWin = process.platform === 'win32';
+            const venvDir = path.join(moonshineDir, '.venv');
+            const venvPy = isWin ? path.join(venvDir, 'Scripts', 'python.exe') : path.join(venvDir, 'bin', 'python');
+
+            if (!fs.existsSync(venvPy)) {
+                return { installed: false };
+            }
+
+            return new Promise((resolve) => {
+                exec(`"${venvPy}" -c "import spacy; spacy.load('en_core_web_sm')"`, { cwd: moonshineDir }, (error) => {
+                    if (error) {
+                        resolve({ installed: false });
+                    } else {
+                        resolve({ installed: true });
+                    }
+                });
+            });
+        } catch (err: any) {
+            return { installed: false, error: err.message };
+        }
+    });
+
     ipcMain.handle('nlp:setup', async () => {
         try {
             const { exec } = await import('child_process');

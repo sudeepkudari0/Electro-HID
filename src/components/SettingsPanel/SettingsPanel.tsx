@@ -318,6 +318,16 @@ export function SettingsPanel({ onClose, onSettingsChanged }: SettingsPanelProps
                 fetchCloudModels('groq', s.groqApiKey, false);
                 fetchCloudModels('mistral', s.mistralApiKey, false);
             }
+
+            try {
+                const statusRes = await window.electronAPI.nlpStatus();
+                if (statusRes.installed) {
+                    setNlpInstalled(true);
+                }
+            } catch (e) {
+                console.error("Failed to check NLP status:", e);
+            }
+
             // Mark initial load complete after state is set
             setTimeout(() => { isInitialLoadRef.current = false; }, 100);
         } catch (error) {
