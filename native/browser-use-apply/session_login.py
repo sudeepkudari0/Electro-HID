@@ -4,11 +4,44 @@ import argparse
 import json
 import re
 import os
-from playwright.async_api import async_playwright
+try:
+    from patchright.async_api import async_playwright
+except ImportError:
+    from playwright.async_api import async_playwright
 
 # Global variables
 job_context_by_page = {}
 payload_data = None
+
+async def wait_for_wellfound_auth(context, page, timeout=900):
+    """
+    Polls until the user is authenticated on Wellfound.
+    Detection strategy: URL-based — logged in means we're on wellfound.com
+    and NOT being redirected to /users/sign_in or /login.
+    """
+    deadline = asyncio.get_running_loop().time() + timeout
+    while asyncio.get_running_loop().time() < deadline:
+        try:
+            if page.is_closed():
+                break
+
+            current_url = page.url
+            # Must be on wellfound.com
+            if "wellfound.com" in current_url:
+                # If NOT on a login/signup page, we're in
+                login_pages = ("/users/sign_in", "/login", "/sign_in", "/signup")
+                if not any(lp in current_url for lp in login_pages):
+                    # Extra confirmation: at least some wellfound cookies exist
+                    cookies = await context.cookies()
+                    wf_cookies = [c for c in cookies if "wellfound.com" in c.get("domain", "")]
+                    if wf_cookies:
+                        return {"success": True, "reason": "url_and_cookie", "url": current_url}
+
+        except Exception:
+            break
+        await asyncio.sleep(1)
+
+    return {"success": False, "reason": "closed_or_timeout", "url": ""}
 
 async def wait_for_linkedin_auth(context, page, timeout=900):
     """
@@ -1093,7 +1126,7 @@ async def perform_autofill_stdin(context, cmd):
 async def main():
     global payload_data
     parser = argparse.ArgumentParser()
-    parser.add_argument("--site", choices=["linkedin", "default"], required=True)
+    parser.add_argument("--site", choices=["linkedin", "default", "wellfound"], required=True)
     parser.add_argument("--user-data-dir", required=True)
     parser.add_argument("--check", action="store_true")
     parser.add_argument("--jobs-file", help="Path to temp JSON payload containing selected jobs and profile")
@@ -1125,7 +1158,7 @@ async def main():
             user_data_dir=args.user_data_dir,
             headless=args.check,
             args=chrome_args,
-            viewport={"width": 1280, "height": 800}
+            no_viewport=True,
         )
 
         if args.check:
@@ -1169,6 +1202,23 @@ async def main():
                         pass
 
                     print(json.dumps({"success": True, "loggedIn": True, "name": name}))
+                except Exception as e:
+                    print(json.dumps({"success": False, "error": str(e)}))
+                sys.stdout.flush()
+                await context.close()
+                return
+            elif args.site == "wellfound":
+                # Check wellfound session by navigating to /jobs and seeing if we're redirected to login
+                try:
+                    page = context.pages[0] if context.pages else await context.new_page()
+                    await page.goto("https://wellfound.com/jobs", timeout=20000, wait_until="domcontentloaded")
+                    await page.wait_for_timeout(2000)
+                    current_url = page.url
+                    login_pages = ("/users/sign_in", "/login", "/sign_in")
+                    if any(lp in current_url for lp in login_pages):
+                        print(json.dumps({"success": True, "loggedIn": False}))
+                    else:
+                        print(json.dumps({"success": True, "loggedIn": True}))
                 except Exception as e:
                     print(json.dumps({"success": False, "error": str(e)}))
                 sys.stdout.flush()
@@ -1746,6 +1796,27 @@ async def main():
                         "type": "login_status",
                         "success": False,
                         "message": "LinkedIn login not completed or browser closed.",
+                        "details": result
+                    }))
+                sys.stdout.flush()
+            elif args.site == "wellfound":
+                await page.goto("https://wellfound.com/login")
+                print(json.dumps({"type": "status", "message": "Please log in to Wellfound in the browser window..."}))
+                sys.stdout.flush()
+
+                result = await wait_for_wellfound_auth(context, page)
+                if result["success"]:
+                    print(json.dumps({
+                        "type": "login_status",
+                        "success": True,
+                        "message": "Wellfound authentication detected!",
+                        "details": result
+                    }))
+                else:
+                    print(json.dumps({
+                        "type": "login_status",
+                        "success": False,
+                        "message": "Wellfound login not completed or browser closed.",
                         "details": result
                     }))
                 sys.stdout.flush()

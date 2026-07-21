@@ -6,7 +6,7 @@
 import { create } from 'zustand';
 
 export type AppModule = 'dashboard' | 'interview' | 'interview-prep' | 'career-hub' | 'settings';
-export type CareerTab = 'jobs' | 'tracking' | 'tailor' | 'search' | 'apply';
+export type CareerTab = 'jobs' | 'tracking' | 'tailor' | 'search' | 'apply' | 'wellfound';
 
 interface NavigationStore {
   activeModule: AppModule;

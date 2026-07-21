@@ -157,6 +157,29 @@ export function setupApplyVenv(
     stdio: "pipe",
   });
 
+  // Also install patchright's patched Chromium (for undetected automation)
+  const patchrightBin =
+    process.platform === "win32"
+      ? path.join(venvDir, "Scripts", "patchright")
+      : path.join(venvDir, "bin", "patchright");
+
+  if (fs.existsSync(patchrightBin)) {
+    console.log("[Apply Setup] Installing Patchright Chromium browser...");
+    onStatusUpdate?.({
+      status: "running",
+      action: "Installing Patchright (stealth) browser binaries...",
+    });
+    try {
+      execSync(`"${patchrightBin}" install chromium`, {
+        cwd: workingDir,
+        timeout: 300_000,
+        stdio: "pipe",
+      });
+    } catch (e) {
+      console.warn("[Apply Setup] Patchright install warning (non-fatal):", e);
+    }
+  }
+
   console.log("[Apply Setup] Done.");
 }
 
@@ -329,7 +352,7 @@ export function approveApply(): Promise<any> {
 }
 
 export function runLogin(
-  site: "linkedin" | "default",
+  site: "linkedin" | "default" | "wellfound",
   onStatusUpdate: (data: any) => void
 ): Promise<any> {
   return new Promise((resolve, reject) => {
@@ -339,7 +362,10 @@ export function runLogin(
       const scriptPath = path.join(nativeDir, "session_login.py");
 
       const userProfileBaseDir = path.join(app.getPath("userData"), "careerHub", "browser-profiles");
-      const profileDir = path.join(userProfileBaseDir, site === "linkedin" ? "linkedin" : "apply-default");
+      const profileDirName = site === "linkedin" ? "linkedin"
+        : site === "wellfound" ? "wellfound"
+        : "apply-default";
+      const profileDir = path.join(userProfileBaseDir, profileDirName);
       fs.mkdirSync(profileDir, { recursive: true });
 
       // Load career profile and LLM config for the manual session
@@ -616,7 +642,7 @@ export function runAutofillSession(
 }
 
 export function checkLoginStatus(
-  site: "linkedin" | "default"
+  site: "linkedin" | "default" | "wellfound"
 ): Promise<any> {
   return new Promise((resolve, reject) => {
     try {
@@ -632,7 +658,10 @@ export function checkLoginStatus(
       const scriptPath = path.join(nativeDir, "session_login.py");
 
       const userProfileBaseDir = path.join(app.getPath("userData"), "careerHub", "browser-profiles");
-      const profileDir = path.join(userProfileBaseDir, site === "linkedin" ? "linkedin" : "apply-default");
+      const profileDirName = site === "linkedin" ? "linkedin"
+        : site === "wellfound" ? "wellfound"
+        : "apply-default";
+      const profileDir = path.join(userProfileBaseDir, profileDirName);
       
       if (!fs.existsSync(profileDir)) {
         return resolve({ success: true, loggedIn: false });
@@ -677,3 +706,96 @@ export function checkLoginStatus(
     }
   });
 }
+
+let activeWellfoundProc: import("child_process").ChildProcess | null = null;
+
+export function runWellfoundApply(
+  options: {
+    profile: any;
+    filters: {
+      role?: string;
+      location?: string;
+      jobType?: string;
+      remote?: boolean;
+      maxJobs?: number;
+    };
+    dryRun?: boolean;
+    onStatusUpdate: (data: any) => void;
+  },
+  onStatusUpdate: (data: any) => void
+): Promise<any> {
+  return new Promise((resolve, reject) => {
+    try {
+      const venvBin = ensureVenvComplete(onStatusUpdate);
+      const nativeDir = getApplyDir();
+      const scriptPath = path.join(nativeDir, "wellfound_apply.py");
+
+      if (!fs.existsSync(scriptPath)) {
+        return reject(new Error(`wellfound_apply.py not found at: ${scriptPath}`));
+      }
+
+      const userProfileBaseDir = path.join(app.getPath("userData"), "careerHub", "browser-profiles");
+      const profileDir = path.join(userProfileBaseDir, "wellfound");
+      fs.mkdirSync(profileDir, { recursive: true });
+
+      const llmConfig = buildLlmConfig();
+
+      const payload = {
+        profile: options.profile || {},
+        filters: options.filters || {},
+        llm: llmConfig,
+        dryRun: options.dryRun !== false,
+        profileDir,
+      };
+
+      const payloadPath = path.join(app.getPath("userData"), "temp-wellfound-payload.json");
+      fs.writeFileSync(payloadPath, JSON.stringify(payload, null, 2), "utf-8");
+
+      console.log("[Wellfound Runner] Spawning wellfound_apply.py");
+      activeWellfoundProc = spawn(venvBin, [scriptPath, "--payload", payloadPath], {
+        cwd: nativeDir,
+      });
+
+      activeWellfoundProc.stdout!.on("data", (data: Buffer) => {
+        const text = data.toString();
+        for (const line of text.split("\n")) {
+          if (!line.trim()) continue;
+          try {
+            onStatusUpdate(JSON.parse(line.trim()));
+          } catch {
+            onStatusUpdate({ type: "log", message: line.trim() });
+          }
+        }
+      });
+
+      activeWellfoundProc.stderr!.on("data", (data: Buffer) => {
+        const text = data.toString().trim();
+        if (text) onStatusUpdate({ type: "log", message: `[stderr] ${text}` });
+      });
+
+      activeWellfoundProc.on("close", (code) => {
+        activeWellfoundProc = null;
+        try { if (fs.existsSync(payloadPath)) fs.unlinkSync(payloadPath); } catch {}
+        resolve({ success: code === 0, code });
+      });
+
+      activeWellfoundProc.on("error", (err) => {
+        activeWellfoundProc = null;
+        reject(err);
+      });
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+export function stopWellfoundApply(): Promise<any> {
+  return new Promise((resolve) => {
+    if (activeWellfoundProc) {
+      activeWellfoundProc.kill("SIGINT");
+      activeWellfoundProc = null;
+    }
+    resolve({ success: true });
+  });
+}
+

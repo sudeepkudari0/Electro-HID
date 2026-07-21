@@ -18,6 +18,7 @@ import { JobBoard } from "./JobBoard";
 import { TailorPanel } from "./TailorPanel";
 import { JobSearch } from "./JobSearch";
 import { ApplyPanel } from "./ApplyPanel";
+import { WellfoundPanel } from "./WellfoundPanel";
 import type { MasterResume } from "../../career/core/types";
 
 const TABS: { id: CareerTab; label: string; icon: string }[] = [
@@ -26,6 +27,7 @@ const TABS: { id: CareerTab; label: string; icon: string }[] = [
   { id: "tailor", label: "Tailor CV", icon: "✨" },
   { id: "search", label: "Job Search", icon: "🔍" },
   { id: "apply", label: "Auto Apply", icon: "🤖" },
+  { id: "wellfound", label: "Wellfound", icon: "🚀" },
 ];
 
 export function CareerHub() {
@@ -208,6 +210,7 @@ export function CareerHub() {
         {careerTab === "tailor" && <TailorPanel />}
         {careerTab === "search" && <JobSearch />}
         {careerTab === "apply" && <ApplyPanel />}
+        {careerTab === "wellfound" && <WellfoundPanel />}
       </div>
 
       {/* Premium Confirmation Modal Overlay */}

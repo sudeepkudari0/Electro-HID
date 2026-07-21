@@ -242,9 +242,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
         approveApply: async () => ipcRenderer.invoke('career:approve-apply'),
         autofillPage: async (options: any) => ipcRenderer.invoke('career:autofill-page', options),
         runAutofillSession: async (options: any) => ipcRenderer.invoke('career:run-autofill-session', options),
-        runLogin: async (site: 'linkedin' | 'default') => ipcRenderer.invoke('career:run-login', site),
+        runLogin: async (site: 'linkedin' | 'default' | 'wellfound') => ipcRenderer.invoke('career:run-login', site),
         stopLogin: async () => ipcRenderer.invoke('career:stop-login'),
-        checkLogin: async (site: 'linkedin' | 'default') => ipcRenderer.invoke('career:check-login', site),
+        checkLogin: async (site: 'linkedin' | 'default' | 'wellfound') => ipcRenderer.invoke('career:check-login', site),
         onApplyStatus: (callback: (eventData: any) => void) => {
             const handler = (_event: any, data: any) => callback(data);
             ipcRenderer.on('career:apply-status', handler);
@@ -252,6 +252,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
         },
         saveBlockedCompanies: async (companies: string[]) => ipcRenderer.invoke('career:blocked-companies:save', companies),
         loadBlockedCompanies: async () => ipcRenderer.invoke('career:blocked-companies:load'),
+        runWellfoundApply: async (options: any) => ipcRenderer.invoke('career:run-wellfound-apply', options),
+        stopWellfoundApply: async () => ipcRenderer.invoke('career:stop-wellfound-apply'),
     },
 
     // Shell API

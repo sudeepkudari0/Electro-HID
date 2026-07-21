@@ -921,7 +921,7 @@ Be concise but thorough. Use bullet points and code blocks where appropriate.`;
         }
     });
 
-    ipcMain.handle(IPC_CHANNELS.CAREER_RUN_LOGIN, async (event, site: 'linkedin' | 'default') => {
+    ipcMain.handle(IPC_CHANNELS.CAREER_RUN_LOGIN, async (event, site: 'linkedin' | 'default' | 'wellfound') => {
         try {
             const { runLogin } = await import('./apply/browser-use-runner');
             const data = await runLogin(site, (statusUpdate) => {
@@ -944,7 +944,7 @@ Be concise but thorough. Use bullet points and code blocks where appropriate.`;
         }
     });
 
-    ipcMain.handle(IPC_CHANNELS.CAREER_CHECK_LOGIN, async (event, site: 'linkedin' | 'default') => {
+    ipcMain.handle(IPC_CHANNELS.CAREER_CHECK_LOGIN, async (event, site: 'linkedin' | 'default' | 'wellfound') => {
         try {
             const { checkLoginStatus } = await import('./apply/browser-use-runner');
             return await checkLoginStatus(site);
@@ -954,6 +954,29 @@ Be concise but thorough. Use bullet points and code blocks where appropriate.`;
         }
     });
 
+    // ── Career Hub: Wellfound Auto Apply ─────────────────────────────────
+    ipcMain.handle(IPC_CHANNELS.CAREER_RUN_WELLFOUND_APPLY, async (event, options: any) => {
+        try {
+            const { runWellfoundApply } = await import('./apply/browser-use-runner');
+            const data = await runWellfoundApply(options, (statusUpdate: any) => {
+                event.sender.send('career:apply-status', statusUpdate);
+            });
+            return { success: true, data };
+        } catch (error) {
+            console.error('IPC: Wellfound apply failed:', error);
+            return { success: false, error: String(error) };
+        }
+    });
+
+    ipcMain.handle(IPC_CHANNELS.CAREER_STOP_WELLFOUND_APPLY, async () => {
+        try {
+            const { stopWellfoundApply } = await import('./apply/browser-use-runner');
+            return await stopWellfoundApply();
+        } catch (error) {
+            console.error('IPC: Stop Wellfound apply failed:', error);
+            return { success: false, error: String(error) };
+        }
+    });
 
     // ── Career Hub: Fetch URL ────────────────────────────────────────────
     ipcMain.handle('career:fetch-url', async (event, url: string) => {
