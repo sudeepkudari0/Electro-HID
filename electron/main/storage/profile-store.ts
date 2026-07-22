@@ -1,6 +1,7 @@
 import { JSONStore } from './store';
 
 export interface Story {
+    id?: string;
     title: string;
     situation: string;
     task: string;
@@ -8,6 +9,16 @@ export interface Story {
     result: string;
     tags: string[];
     metrics: string[];
+    narrative: string;
+    techStack: string;
+    architecture: string;
+    challenges: string;
+    tradeoffs: string;
+    mistakes: string;
+    lessonsLearned: string;
+    keywords: string;
+    searchSummary: string;
+    embeddingText: string;
 }
 
 export interface UserProfile {

@@ -9,7 +9,11 @@ import {
 import { useLLM } from "./hooks/useLLM";
 import { useProfile } from "./hooks/useProfile";
 import { isQuestion } from "./lib/question-detector";
-import { classifyQuestion } from "./lib/interview-classifier";
+import { classifyQuestion, classifyDetailedQuestion } from "./lib/interview-classifier";
+import { retrieveStory } from "./lib/story-retriever";
+import { predictFollowUps } from "./lib/follow-up-predictor";
+import { getPromptTemplate } from "./lib/prompts";
+import { PromptContext } from "./lib/prompts/types";
 import { analyzeDelivery } from "./lib/delivery-analyzer";
 import { getCodeAnalysisPrompt } from "./lib/prompts/templates/code-analysis";
 import { TimestampDeduplicator } from "./lib/timestamp-deduplicator";
@@ -620,32 +624,53 @@ function App(): JSX.Element {
       .join("\n\n");
 
     const settingsRes = await window.electronAPI.getSettings();
-    let interviewType =
+    let defaultInterviewType =
       settingsRes.success && settingsRes.settings
         ? settingsRes.settings.interviewType
         : "general";
 
-    const detected = classifyQuestion(contextTranscript);
-    if (detected !== "general") {
-      interviewType = detected;
+    // 1. Classify the question details (25 categories)
+    const detailedCategory = classifyDetailedQuestion(contextTranscript);
+    const mappedInterviewType = classifyQuestion(contextTranscript);
+    const interviewType = mappedInterviewType !== "general" ? mappedInterviewType : defaultInterviewType;
+
+    // 2. Retrieve matching story
+    const { recentStoryIds, addRecentStoryId } = useAnswerStore.getState();
+    const retrievalResult = retrieveStory(
+      contextTranscript,
+      detailedCategory,
+      profile.stories || [],
+      recentStoryIds,
+      profile.resume
+    );
+
+    // If story was chosen, record usage to avoid instant repeats
+    if (retrievalResult.chosenSource === 'story' && retrievalResult.selectedStory) {
+      addRecentStoryId(retrievalResult.selectedStory.id);
     }
 
+    // 3. Prepare the prompt context and pre-compute debug prompt
+    const promptContext: PromptContext = {
+      interviewType: interviewType as any,
+      currentQuestion: contextTranscript,
+      conversationHistory: "",
+      resume: profile.resume,
+      jobDescription: profile.jobDescription,
+      company: profile.targetCompany,
+      useBulletPoints,
+      selectedStory: retrievalResult.selectedStory,
+      retrievalSource: retrievalResult.chosenSource,
+      similarityScore: retrievalResult.similarityScore
+    };
+    const resolvedTemplate = getPromptTemplate(promptContext);
     const llmReqStartTime = performance.now();
     let firstTokenTime: number | null = null;
 
     try {
       let streamedAnswer = "";
 
-      await generateAnswerWithTemplate(
-        {
-          interviewType: interviewType as any,
-          currentQuestion: contextTranscript,
-          conversationHistory: "",
-          resume: profile.resume,
-          jobDescription: profile.jobDescription,
-          company: profile.targetCompany,
-          useBulletPoints,
-        },
+      const finalResponse = await generateAnswerWithTemplate(
+        promptContext,
         (chunk) => {
           if (!firstTokenTime) {
             firstTokenTime = performance.now();
@@ -683,9 +708,44 @@ function App(): JSX.Element {
         signal
       );
 
+      const totalLatencyMs = performance.now() - llmReqStartTime;
+      const ttftMs = firstTokenTime ? (firstTokenTime - llmReqStartTime) : 0;
+
+      const activeModel = settingsRes.success && settingsRes.settings
+        ? (settingsRes.settings.mistralModel || settingsRes.settings.geminiModel || "mistral-3b")
+        : "mistral-3b";
+
+      // Print all pipeline debug telemetry directly to developer console group
+      console.groupCollapsed(`[Pipeline Debug Info] 🎯 Source: ${retrievalResult.chosenSource} | Latency: ${(totalLatencyMs / 1000).toFixed(2)}s`);
+      console.log(`Question: "${_questionText}"`);
+      console.log(`Classification Category: ${detailedCategory}`);
+      console.log(`Chosen Source: ${retrievalResult.chosenSource === 'story' ? `Story: "${retrievalResult.selectedStory?.title}"` : retrievalResult.chosenSource}`);
+      console.log(`Similarity Score: ${retrievalResult.similarityScore !== undefined ? retrievalResult.similarityScore.toFixed(3) : 'N/A'}`);
+      console.log(`Model Used: ${activeModel}`);
+      console.log(`Prompt Version: 2.1-grounded-narrative`);
+      console.log(`Time to First Token (TTFT): ${ttftMs.toFixed(0)}ms`);
+      console.log(`Total Generation Latency: ${totalLatencyMs.toFixed(0)}ms`);
+      if (retrievalResult.debugInfo?.retrievedStories) {
+        console.log(`Story Bank Match Matrices:`);
+        console.table(retrievalResult.debugInfo.retrievedStories);
+      }
+      console.log(`Generated Prompt Context:`);
+      console.log(resolvedTemplate.system);
+      console.groupEnd();
+
+      // 4. Predict follow-up questions from the story context
+      const followUps = await predictFollowUps(
+        contextTranscript,
+        finalResponse,
+        interviewType as any,
+        retrievalResult.selectedStory
+      );
+
       updateCandidateAnswer(candidateId, {
         isStreaming: false,
         status: "answered",
+        followUps,
+        debugInfo: undefined // Completely clear debugInfo from UI state
       });
     } catch (error: any) {
       if (error?.message === 'AbortError') {

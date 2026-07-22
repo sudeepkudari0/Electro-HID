@@ -41,7 +41,7 @@
 .widget--expanded {
     /* Dynamic: grows with content, capped at 90% of viewport height */
     max-height: 90vh;
-    width: var(--widget-expanded-width, 860px);
+    width: var(--widget-expanded-width, 580px);
 }
 
 /* ─── Widget Body (expandable content area) ─── */
@@ -375,5 +375,10 @@ body.is-resizing * {
     user-select: text !important;
     -webkit-user-select: text !important;
     cursor: text;
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.scrollbar-none::-webkit-scrollbar {
+    display: none;
 }
 

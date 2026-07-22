@@ -1,3 +1,5 @@
+import { Story } from '../../state/profile-store';
+
 export type InterviewType = 
     | 'behavioral'
     | 'technical'
@@ -16,6 +18,12 @@ export interface PromptContext {
     company?: string;
     targetRole?: string;
     useBulletPoints?: boolean;
+    
+    // New retrieval metadata
+    selectedStory?: Story;
+    retrievalSource?: 'story' | 'resume' | 'honest_fallback';
+    similarityScore?: number;
+    debugInfo?: any;
 }
 
 export interface PromptTemplate {

@@ -1,6 +1,5 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { WidgetHeader } from './WidgetHeader';
-import { TranscriptPanel } from './TranscriptPanel';
 import { AnswerSuggestions } from './AnswerSuggestions';
 
 import { ChatPanel } from '../ChatPanel/ChatPanel';
@@ -96,8 +95,16 @@ export function FloatingWidget({
     onToggleAutoDetection,
 }: FloatingWidgetProps) {
     const widgetRef = useRef<HTMLDivElement>(null);
+    const liveTranscriptRef = useRef<HTMLDivElement>(null);
     const prevCandidateCount = useRef(candidateQuestions.length);
     const [selectedSession, setSelectedSession] = useState<any>(null);
+
+    // Auto-scroll live transcript to the right as text grows
+    useEffect(() => {
+        if (liveTranscriptRef.current) {
+            liveTranscriptRef.current.scrollLeft = liveTranscriptRef.current.scrollWidth;
+        }
+    }, [conversation]);
     const widgetOpacity = useUIStore((state) => state.widgetOpacity);
     const isLinux = window.electronAPI?.platform === 'linux';
 
@@ -118,7 +125,7 @@ export function FloatingWidget({
     }, [isLinux]);
 
     // ─── Widget Size (for resize) ───
-    const [widgetSize, setWidgetSize] = useState({ width: 860, height: -1 });
+    const [widgetSize, setWidgetSize] = useState({ width: 580, height: -1 });
 
     const handleResize = useCallback((deltaW: number, deltaH: number, edge: 'left' | 'bottom' | 'bottom-left') => {
         setWidgetSize(prev => {
@@ -239,7 +246,7 @@ export function FloatingWidget({
                             height: widgetSize.height !== -1 ? `${widgetSize.height}px` : undefined,
                             maxHeight: widgetSize.height !== -1 ? 'none' : `${Math.floor(window.screen.availHeight * 0.88)}px`,
                         } : {
-                            width: '860px',
+                            width: '580px',
                         }),
                     } : {
                         top: isTeleprompterMode ? 0 : `${widgetPos.top}px`,
@@ -343,32 +350,41 @@ export function FloatingWidget({
                                 </div>
                             )}
 
-                            {/* ═══ Split Panel Layout ═══ */}
-                            <div className="split-layout">
-                                {/* Left: Transcript */}
-                                <div className="split-layout__left">
-                                    <TranscriptPanel
-                                        conversation={conversation}
-                                        onClear={onClearTranscript}
-                                        isRecording={isRecording}
-                                        sttEngine={sttEngine}
-                                        sttModel={sttModel}
-                                        audioLevels={audioLevels}
-                                    />
+                            {/* ═══ Interviewer Live Transcript Bar ═══ */}
+                            {isRecording && (
+                                <div className="bg-zinc-900/60 px-4 py-2 border-b border-[var(--border-subtle)] flex items-center gap-2 select-text shrink-0 animate-slide-up">
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                        <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">Interviewer:</span>
+                                    </div>
+                                    <div 
+                                        ref={liveTranscriptRef}
+                                        className="text-xs text-zinc-300 italic flex-1 overflow-x-auto select-text scrollbar-none"
+                                        style={{ whiteSpace: 'nowrap', scrollbarWidth: 'none' }}
+                                        title={(() => {
+                                            const latest = [...conversation].reverse().find(b => b.speaker === 'interviewer');
+                                            return latest?.text || "Silence (listening for interviewer...)";
+                                        })()}
+                                    >
+                                        {(() => {
+                                            const latest = [...conversation].reverse().find(b => b.speaker === 'interviewer');
+                                            return latest?.text || "Silence (listening for interviewer...)";
+                                        })()}
+                                    </div>
                                 </div>
+                            )}
 
-                                {/* Right: Answer Suggestions */}
-                                <div className="split-layout__right">
-                                    <AnswerSuggestions
-                                        candidateQuestions={candidateQuestions}
-                                        detectedQuestions={detectedQuestions}
-                                        expandedQuestionId={expandedQuestionId}
-                                        onPickQuestion={onPickQuestion}
-                                        onDismissCandidate={onDismissCandidate}
-                                        onSelectOption={onSelectOption}
-                                        onClearAll={handleClearAll}
-                                    />
-                                </div>
+                            {/* ═══ Single Panel Layout ═══ */}
+                            <div className="flex-1 min-h-[300px] overflow-hidden flex flex-col">
+                                <AnswerSuggestions
+                                    candidateQuestions={candidateQuestions}
+                                    detectedQuestions={detectedQuestions}
+                                    expandedQuestionId={expandedQuestionId}
+                                    onPickQuestion={onPickQuestion}
+                                    onDismissCandidate={onDismissCandidate}
+                                    onSelectOption={onSelectOption}
+                                    onClearAll={handleClearAll}
+                                />
                             </div>
 
                             {/* ═══ Bottom Bar ═══ */}
@@ -378,7 +394,7 @@ export function FloatingWidget({
                                     <span>Privacy First (Local Only)</span>
                                 </div>
 
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1.5">
                                     <span className="text-[10px] text-zinc-400 font-medium">
                                         Auto Question Detection
                                     </span>

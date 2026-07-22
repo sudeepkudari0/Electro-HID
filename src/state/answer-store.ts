@@ -20,6 +20,7 @@ export interface CandidateQuestion {
     // Inline answer (generated when user clicks the question)
     answer?: string;
     isStreaming?: boolean;
+    debugInfo?: any;
 }
 
 // Legacy Answer interface — kept for backward compatibility (screen capture, etc.)
@@ -32,6 +33,7 @@ export interface Answer {
     isStreaming?: boolean;
     detectedType?: string;
     followUps?: string[];
+    debugInfo?: any;
 }
 
 // ─── Deduplication utility ───
@@ -99,12 +101,16 @@ interface AnswerState {
     currentAnswerIndex: number;
     isGenerating: boolean;
 
+    // New: Story tracking
+    recentStoryIds: string[];
+    addRecentStoryId: (id: string) => void;
+
     // ─── Candidate question actions ───
     addCandidateQuestion: (text: string, confidence: number, signals: string[]) => string;
     removeCandidateQuestion: (id: string) => void;
     clearCandidateQuestions: () => void;
     setCandidateStatus: (id: string, status: CandidateQuestion['status']) => void;
-    updateCandidateAnswer: (id: string, updates: Partial<Pick<CandidateQuestion, 'answer' | 'isStreaming' | 'status'>>) => void;
+    updateCandidateAnswer: (id: string, updates: Partial<CandidateQuestion>) => void;
 
     // ─── Detected question actions (kept for backward compat) ───
     addDetectedQuestion: (question: DetectedQuestion) => void;
@@ -132,6 +138,12 @@ export const useAnswerStore = create<AnswerState>((set) => ({
     answers: [],
     currentAnswerIndex: 0,
     isGenerating: false,
+    recentStoryIds: [],
+
+    addRecentStoryId: (id) =>
+        set((state) => ({
+            recentStoryIds: [id, ...state.recentStoryIds.filter((x) => x !== id)].slice(0, 3),
+        })),
 
     // ─── Candidate question actions ───
 

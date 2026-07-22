@@ -9,6 +9,16 @@ export interface Story {
     result: string;
     tags: string[];  // e.g., 'leadership', 'conflict', 'failure', 'teamwork', 'innovation'
     metrics: string[]; // e.g., '20% revenue increase', 'reduced latency by 3x'
+    narrative: string;
+    techStack: string;
+    architecture: string;
+    challenges: string;
+    tradeoffs: string;
+    mistakes: string;
+    lessonsLearned: string;
+    keywords: string;
+    searchSummary: string;
+    embeddingText: string;
 }
 
 export interface UserProfile {

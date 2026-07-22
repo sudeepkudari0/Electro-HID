@@ -4,31 +4,29 @@ export const getTechnicalPrompt = (context: PromptContext): PromptTemplate => {
     return {
         system: `You are the candidate's inner voice during a live technical interview — think out loud the way a senior engineer actually talks, not a textbook.
 
-Respond ONLY with valid JSON, no markdown fences, no commentary:
+Respond ONLY with valid JSON, no markdown fences, no commentary before or after. The response structure must match exactly:
 {
-  "hook": "<1 spoken sentence, the bottom-line answer or trade-off>",
-  "points": ["<max 12 words>", "<max 12 words>", "..."],
-  "edgeCase": "<1 short sentence on a practical risk or bottleneck>"
+  "answer": "<The natural, first-person spoken answer explaining the technical concept. It must flow naturally in spoken voice as a complete response. Maximum 120 words.>",
+  "reflection": "<One optional sentence about a practical risk, tradeoff, or bottleneck. Maximum 20 words.>"
 }
 
-RULES:
-1. First person, as if you are about to say this out loud right now.
-2. 2-4 points: use fewer for narrow questions, more only for multi-part ones.
-3. Never use: delve, spearhead, testament, crucial, robust, holistic, moreover, furthermore, synergy, paradigm.
-4. No headers, no "Situation/Approach/Result" labels — just talk.
-${context.company ? `5. COMPANY CONTEXT: Keep in mind the technical stack and scale at ${context.company}.` : ''}
+STRICT GROUNDING RULES:
+1. SOURCE OF TRUTH: The candidate's resume/profile is the absolute source of truth.
+2. EXPAND ONLY WHAT IS SUPPORTED: Expand only what is explicitly supported. You may: reorder information, improve grammar, connect ideas naturally.
+3. STRICTLY PROHIBITED: You may NOT:
+   - Invent technologies.
+   - Invent metrics.
+   - Invent architecture.
+   - Invent production incidents.
+   - Invent business impact.
+   - Invent challenges.
+4. ACCURACY OVER COMPLETENESS: If a detail is missing, omit it. Do not fill gaps using industry knowledge or assumptions.
+5. FIRST PERSON, SPOKEN VOICE: Speak as the candidate. Natural spoken tone.
+6. NO FILLER OPENERS: Do not start with "In my experience," "One example is," etc.
+7. BANNED WORDS: delve, spearhead, testament, crucial, robust, holistic, moreover, furthermore, synergy, paradigm, leverage, passionate, results-driven.
 
-EXAMPLE:
-Q: "What's the difference between optimistic and pessimistic locking?"
-{
-  "hook": "Optimistic assumes conflicts are rare, pessimistic assumes they're common.",
-  "points": [
-    "Optimistic checks a version number before committing a write",
-    "Pessimistic locks the row upfront, blocking other writers",
-    "I'd use optimistic for read-heavy, pessimistic for write-heavy"
-  ],
-  "edgeCase": "Optimistic can thrash under high write contention, causing retries."
-}`,
+${context.company ? `COMPANY CONTEXT: Keep in mind the technical stack and scale at ${context.company}.` : ''}
+`,
         
         user: `Candidate Background / Resume:
 ${context.resume || 'Not provided. Assume a mid-to-senior level software engineer profile.'}
@@ -45,5 +43,3 @@ Interview Question:
 Generate the JSON inner voice speaking notes right now:`
     };
 };
-
-

@@ -1,8 +1,7 @@
 // Shared robust progressive JSON parser supporting live streaming chunks, smart quotes, key synonyms, and multiline strings
 export interface StructuredTeleprompterAnswer {
-    hook?: string;
-    points?: string[];
-    edgeCase?: string;
+    answer?: string;
+    reflection?: string;
 }
 
 export function parseProgressiveJson(rawText?: string): StructuredTeleprompterAnswer | null {
@@ -25,7 +24,7 @@ export function parseProgressiveJson(rawText?: string): StructuredTeleprompterAn
             text = text.substring(firstBrace);
         }
     } else {
-        if (!text.includes('"hook"') && !text.includes('"points"') && !text.includes('"Direct Hook"') && !text.includes('"Key Points"')) {
+        if (!text.includes('"hook"') && !text.includes('"points"') && !text.includes('"answer"') && !text.includes('"narrative"')) {
             return null;
         }
     }
@@ -38,47 +37,66 @@ export function parseProgressiveJson(rawText?: string): StructuredTeleprompterAn
             const hook = parsed.hook || parsed['Direct Hook'] || parsed.bottomLine || parsed.bottom_line || parsed.summary;
             const points = parsed.points || parsed['Key Points'] || parsed['Key Talking Points'] || parsed.key_points || parsed.bullets || parsed.items;
             const edgeCase = parsed.edgeCase || parsed['Edge Case'] || parsed['Trade-off'] || parsed.trade_off || parsed.nuance || parsed.risk;
+            const answer = parsed.answer || parsed.response || parsed.narrative;
+            const reflection = parsed.reflection || parsed.lesson;
 
-            if (hook || (Array.isArray(points) && points.length > 0) || edgeCase) {
-                return {
-                    hook: typeof hook === 'string' ? hook : undefined,
-                    points: Array.isArray(points) ? points.map(String) : typeof points === 'string' ? [points] : undefined,
-                    edgeCase: typeof edgeCase === 'string' ? edgeCase : undefined,
-                };
+            let finalAnswer = typeof answer === 'string' ? answer : '';
+            if (!finalAnswer) {
+                const hookText = typeof hook === 'string' ? hook : '';
+                const pointsText = Array.isArray(points) ? points.join(' ') : typeof points === 'string' ? points : '';
+                finalAnswer = [hookText, pointsText].filter(Boolean).join('\n\n');
             }
+
+            const finalReflection = typeof reflection === 'string' ? reflection : typeof edgeCase === 'string' ? edgeCase : undefined;
+
+            return {
+                answer: finalAnswer || undefined,
+                reflection: finalReflection || undefined,
+            };
         }
     } catch {
         // Progressive fallback when streaming OR when string has unescaped multiline characters
     }
 
     // 5. Bulletproof multiline regex extraction supporting all key synonyms & unescaped quotes/newlines
-    const hookMatch = /"(?:hook|Direct Hook|bottomLine|bottom_line|summary)"\s*:\s*"([\s\S]*?)"(?=\s*(?:,\s*"(?:points|Key Points|edgeCase|Edge Case|Trade-off)"|,\s*\}$|^\s*\}$|$))/i.exec(text);
-    const edgeCaseMatch = /"(?:edgeCase|Edge Case|Trade-off|trade_off|nuance|risk)"\s*:\s*"([\s\S]*?)"(?=\s*(?:,\s*"(?:hook|points)"|,\s*\}$|^\s*\}$|$))/i.exec(text);
+    const answerMatch = /"(?:answer|response|narrative)"\s*:\s*"([\s\S]*?)"(?=\s*(?:,\s*"(?:reflection|lesson|edgeCase|Edge Case)"|,\s*\}$|^\s*\}$|$))/i.exec(text);
+    const reflectionMatch = /"(?:reflection|lesson|edgeCase|Edge Case|Trade-off|trade_off|nuance|risk)"\s*:\s*"([\s\S]*?)"(?=\s*(?:,\s*"(?:answer|response)"|,\s*\}$|^\s*\}$|$))/i.exec(text);
 
-    let points: string[] = [];
-    const pointsBlockMatch = /"(?:points|Key Points|Key Talking Points|key_points|bullets|items)"\s*:\s*\[([\s\S]*?)(?:\]|$)/i.exec(text);
-    if (pointsBlockMatch) {
-        const blockContent = pointsBlockMatch[1];
-        const itemRegex = /"([\s\S]*?)"(?=\s*(?:,|$))/g;
-        let m;
-        while ((m = itemRegex.exec(blockContent)) !== null) {
-            const pt = m[1].replace(/\\"/g, '"').replace(/\n+/g, ' ').trim();
-            if (pt) points.push(pt);
+    let answerVal = answerMatch ? answerMatch[1].replace(/\\"/g, '"').replace(/\n+/g, ' ').trim() : undefined;
+    const reflectionVal = reflectionMatch ? reflectionMatch[1].replace(/\\"/g, '"').replace(/\n+/g, ' ').trim() : undefined;
+
+    if (!answerVal) {
+        // Fallback to legacy hook / points
+        const hookMatch = /"(?:hook|Direct Hook|bottomLine|bottom_line|summary)"\s*:\s*"([\s\S]*?)"(?=\s*(?:,\s*"(?:points|Key Points|edgeCase|Edge Case)"|,\s*\}$|^\s*\}$|$))/i.exec(text);
+        
+        let points: string[] = [];
+        const pointsBlockMatch = /"(?:points|Key Points|Key Talking Points|key_points|bullets|items)"\s*:\s*\[([\s\S]*?)(?:\]|$)/i.exec(text);
+        if (pointsBlockMatch) {
+            const blockContent = pointsBlockMatch[1];
+            const itemRegex = /"([\s\S]*?)"(?=\s*(?:,|$))/g;
+            let m;
+            while ((m = itemRegex.exec(blockContent)) !== null) {
+                const pt = m[1].replace(/\\"/g, '"').replace(/\n+/g, ' ').trim();
+                if (pt) points.push(pt);
+            }
+            const unclosedMatch = /(?:^|,)\s*"([^"]*)$/.exec(blockContent);
+            if (unclosedMatch) {
+                const pt = unclosedMatch[1].replace(/\\"/g, '"').replace(/\n+/g, ' ').trim();
+                if (pt && !points.includes(pt)) points.push(pt);
+            }
         }
-        const unclosedMatch = /(?:^|,)\s*"([^"]*)$/.exec(blockContent);
-        if (unclosedMatch) {
-            const pt = unclosedMatch[1].replace(/\\"/g, '"').replace(/\n+/g, ' ').trim();
-            if (pt && !points.includes(pt)) points.push(pt);
-        }
+
+        const hookVal = hookMatch ? hookMatch[1].replace(/\\"/g, '"').replace(/\n+/g, ' ').trim() : '';
+        const pointsVal = points.join(' ');
+        answerVal = [hookVal, pointsVal].filter(Boolean).join('\n\n');
     }
 
-    if (!hookMatch && points.length === 0 && !edgeCaseMatch) {
+    if (!answerVal && !reflectionVal) {
         return null;
     }
 
     return {
-        hook: hookMatch ? hookMatch[1].replace(/\\"/g, '"').replace(/\n+/g, ' ').trim() : undefined,
-        points: points.length > 0 ? points : undefined,
-        edgeCase: edgeCaseMatch ? edgeCaseMatch[1].replace(/\\"/g, '"').replace(/\n+/g, ' ').trim() : undefined,
+        answer: answerVal || undefined,
+        reflection: reflectionVal || undefined,
     };
 }
