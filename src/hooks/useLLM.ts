@@ -46,7 +46,7 @@ Provide structured, professional answers that:
                     systemPrompt,
                     prompt: fullPrompt,
                     temperature: options.temperature ?? 0.7,
-                    maxTokens: options.maxTokens ?? 512,
+                    maxTokens: options.maxTokens ?? 8192,
                     stream: !!onChunk,
                     imageData,
                 }, onChunk);
@@ -96,7 +96,7 @@ Provide structured, professional answers that:
                     systemPrompt: template.system,
                     prompt: template.user,
                     temperature: options.temperature ?? 0.7,
-                    maxTokens: options.maxTokens ?? 512,
+                    maxTokens: options.maxTokens ?? 8192,
                     stream: !!onChunk,
                     imageData,
                     requestId,
@@ -140,7 +140,7 @@ Provide structured, professional answers that:
                     systemPrompt: template.system,
                     prompt: template.user,
                     temperature: options.temperature ?? 0.7,
-                    maxTokens: options.maxTokens ?? 1024,
+                    maxTokens: options.maxTokens ?? 8192,
                     stream: !!onChunk,
                     format: format, // Pass format if supported by IPC
                 }, onChunk);

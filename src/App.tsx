@@ -148,6 +148,9 @@ function App(): JSX.Element {
   const lastDetectionTimeRef = useRef<number>(0);
   const autoAnswerConfidenceThresholdRef = useRef<number>(0.8);
   const deepgramFinalTextRef = useRef<{ user: string; interviewer: string }>({ user: "", interviewer: "" });
+  // Persistent interviewer accumulator — immune to speaker changes and user interruptions
+  const interviewerAccumulatorRef = useRef<string>("");
+  const accumulatorCheckpointRef = useRef<number>(0);
 
   // Sync conversationRef with store
   useEffect(() => {
@@ -251,6 +254,8 @@ function App(): JSX.Element {
                 continue; // Skip — this is the user's voice on the system audio channel
               }
               echoSuppressorRef.current.recordInterviewerTranscription(text);
+              // Append to persistent interviewer accumulator (interruption-immune)
+              interviewerAccumulatorRef.current += (interviewerAccumulatorRef.current ? " " : "") + text;
             }
 
             const stabilizer =
@@ -291,12 +296,6 @@ function App(): JSX.Element {
               }
 
               conversationRef.current = newConv;
-
-              // If user starts speaking, cancel any pending detection
-              if (nextItem.source === "user" && autoDetectTimeoutRef.current) {
-                clearTimeout(autoDetectTimeoutRef.current);
-                autoDetectTimeoutRef.current = null;
-              }
 
               // If new interviewer text arrives during detection window, reset it
               if (
@@ -348,6 +347,11 @@ function App(): JSX.Element {
           }
         }
 
+        // Append to persistent interviewer accumulator on final results (interruption-immune)
+        if (source === "interviewer" && data.isFinal) {
+          interviewerAccumulatorRef.current += (interviewerAccumulatorRef.current ? " " : "") + text;
+        }
+
         setConversation((prev: ChatBlock[]) => {
           const newConv = [...prev];
           const lastBlock =
@@ -381,11 +385,6 @@ function App(): JSX.Element {
           }
 
           conversationRef.current = newConv;
-
-          if (source === "user" && autoDetectTimeoutRef.current) {
-            clearTimeout(autoDetectTimeoutRef.current);
-            autoDetectTimeoutRef.current = null;
-          }
 
           if (source === "interviewer" && autoDetectTimeoutRef.current) {
             console.log("[Detection] New interviewer text arrived — resetting detection window");
@@ -465,11 +464,12 @@ function App(): JSX.Element {
 
       if (!autoDetectionEnabled) return;
 
-      const conv = conversationRef.current;
-      const lastInterviewerBlock = [...conv]
-        .reverse()
-        .find((b) => b.speaker === "interviewer");
-      if (!lastInterviewerBlock || !lastInterviewerBlock.text.trim()) return;
+      // Use persistent accumulator instead of conversation blocks
+      // to avoid fragmentation from user interruptions
+      const fullAccumulator = interviewerAccumulatorRef.current;
+      const checkpoint = accumulatorCheckpointRef.current;
+      const newText = fullAccumulator.slice(checkpoint).trim();
+      if (!newText) return;
 
       const speechStartPerf = speechStartPerfRef.current;
       const speechEndPerf = speechEndPerfRef.current;
@@ -477,7 +477,7 @@ function App(): JSX.Element {
       const speechEndTimeStr = speechEndTimeStrRef.current;
 
       const evalStartTime = performance.now();
-      const detection = await isQuestion(lastInterviewerBlock.text);
+      const detection = await isQuestion(newText);
       const totalEvalMs = performance.now() - evalStartTime;
 
       const speechDurationMs = (speechStartPerf && speechEndPerf)
@@ -496,7 +496,7 @@ function App(): JSX.Element {
       console.groupCollapsed(
         `[Question Detection] ${isPassed ? '✅ QUESTION DETECTED' : '❌ NOT DETECTED'} (${totalEvalMs.toFixed(1)}ms)`
       );
-      console.log(`Utterance: "${lastInterviewerBlock.text}"`);
+      console.log(`Utterance: "${newText}"`);
       console.log(
         `Score: ${detection.score} (Threshold: 25) | Confidence: ${(detection.confidence * 100).toFixed(0)}% | Complete: ${detection.syntacticallyComplete ? 'Yes ✅' : 'No ❌'}`
       );
@@ -508,9 +508,10 @@ function App(): JSX.Element {
       // Only proceed if it is syntactically complete (Tier 1 Gate passed)
       if (isPassed) {
         lastDetectionTimeRef.current = Date.now();
+        accumulatorCheckpointRef.current = fullAccumulator.length;
         // Add to candidates list — deduplication happens inside the store
         const candidateId = addCandidateQuestion(
-          lastInterviewerBlock.text,
+          newText,
           detection.confidence,
           detection.signals,
         );
@@ -534,7 +535,7 @@ function App(): JSX.Element {
               detectionResult: detection,
             };
 
-            handlePickQuestionRef.current(candidateId, lastInterviewerBlock.text, controller.signal, telemetryMeta).finally(() => {
+            handlePickQuestionRef.current(candidateId, newText, controller.signal, telemetryMeta).finally(() => {
               if (activeAutoAnswerAbortControllerRef.current === controller) {
                 activeAutoAnswerAbortControllerRef.current = null;
               }
@@ -843,6 +844,8 @@ function App(): JSX.Element {
         userStabilizerRef.current.clear();
         interviewerStabilizerRef.current.clear();
         deepgramFinalTextRef.current = { user: "", interviewer: "" };
+        interviewerAccumulatorRef.current = "";
+        accumulatorCheckpointRef.current = 0;
         clearTranscript();
         conversationRef.current = [];
         clearChunks();
@@ -925,6 +928,8 @@ function App(): JSX.Element {
     userStabilizerRef.current.clear();
     interviewerStabilizerRef.current.clear();
     deepgramFinalTextRef.current = { user: "", interviewer: "" };
+    interviewerAccumulatorRef.current = "";
+    accumulatorCheckpointRef.current = 0;
     clearTranscript();
     conversationRef.current = [];
     if (autoDetectTimeoutRef.current) {

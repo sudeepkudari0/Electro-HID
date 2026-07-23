@@ -32,7 +32,7 @@ Return exactly 3 questions, one per line. Do not include numbering, bullet point
             systemPrompt,
             prompt,
             temperature: 0.7,
-            maxTokens: 100,
+            maxTokens: 512,
             stream: false
         });
 

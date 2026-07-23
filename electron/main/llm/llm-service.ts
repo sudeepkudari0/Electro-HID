@@ -438,7 +438,7 @@ export class LLMService {
             config: {
                 systemInstruction: options.systemPrompt,
                 temperature: options.temperature ?? 0.7,
-                maxOutputTokens: options.maxTokens ?? 1024,
+                maxOutputTokens: options.maxTokens ?? 8192,
             },
         });
 
@@ -463,7 +463,7 @@ export class LLMService {
             config: {
                 systemInstruction: options.systemPrompt,
                 temperature: options.temperature ?? 0.7,
-                maxOutputTokens: options.maxTokens ?? 1024,
+                maxOutputTokens: options.maxTokens ?? 8192,
             },
         });
 

@@ -604,7 +604,7 @@ Be clear, structured, and helpful.`;
                 prompt: fullPrompt,
                 imageData: params.imageData,
                 temperature: 0.7,
-                maxTokens: 1024,
+                maxTokens: 8192,
                 stream: false,
             });
 
@@ -646,7 +646,7 @@ Be concise but thorough. Use bullet points and code blocks where appropriate.`;
                 prompt: userPrompt,
                 imageData,
                 temperature: 0.5,
-                maxTokens: 2048,
+                maxTokens: 8192,
                 stream: false,
             });
 

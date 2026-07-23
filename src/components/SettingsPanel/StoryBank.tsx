@@ -10,10 +10,10 @@ const STORY_TAGS = ['leadership', 'conflict', 'failure', 'teamwork', 'innovation
 function extractJsonFromString(str: string): any {
     const firstBracket = str.indexOf('[');
     const firstBrace = str.indexOf('{');
-    
+
     let startIndex = -1;
     let endIndex = -1;
-    
+
     if (firstBracket !== -1 && (firstBrace === -1 || firstBracket < firstBrace)) {
         startIndex = firstBracket;
         endIndex = str.lastIndexOf(']');
@@ -21,14 +21,14 @@ function extractJsonFromString(str: string): any {
         startIndex = firstBrace;
         endIndex = str.lastIndexOf('}');
     }
-    
+
     if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
         const jsonStr = str.substring(startIndex, endIndex + 1);
         // Normalize smart/curly double quotes
         const normalized = jsonStr.replace(/[\u201C\u201D\u201E\u201F\u2033\u2036]/g, '"');
         return JSON.parse(normalized);
     }
-    
+
     throw new Error("Could not locate valid JSON braces or brackets in response. Raw response: " + str.substring(0, 150) + "...");
 }
 
@@ -90,7 +90,7 @@ Tags: ${form.tags.join(', ')}`;
                 systemPrompt,
                 prompt: userPrompt,
                 temperature: 0.1,
-                maxTokens: 2048,
+                maxTokens: 8192,
                 format: 'json'
             });
 
@@ -180,7 +180,7 @@ Tags: ${story.tags?.join(', ') || ''}`;
                 systemPrompt,
                 prompt: userPrompt,
                 temperature: 0.1,
-                maxTokens: 2048,
+                maxTokens: 8192,
                 format: 'json'
             });
 
@@ -280,7 +280,7 @@ Return as a JSON array of objects with these exact fields.`;
                 systemPrompt,
                 prompt: userPrompt,
                 temperature: 0.2,
-                maxTokens: 3000,
+                maxTokens: 8192,
                 format: 'json'
             });
 
@@ -378,11 +378,10 @@ Return as a JSON array of objects with these exact fields.`;
                                     key={tag}
                                     type="button"
                                     onClick={() => toggleTag(tag)}
-                                    className={`text-[10px] px-2 py-0.5 rounded-full transition-colors ${
-                                        form.tags.includes(tag)
-                                            ? 'bg-blue-500/30 text-blue-300 border border-blue-500/50'
-                                            : 'bg-zinc-700 text-zinc-400 border border-transparent hover:text-zinc-200'
-                                    }`}
+                                    className={`text-[10px] px-2 py-0.5 rounded-full transition-colors ${form.tags.includes(tag)
+                                        ? 'bg-blue-500/30 text-blue-300 border border-blue-500/50'
+                                        : 'bg-zinc-700 text-zinc-400 border border-transparent hover:text-zinc-200'
+                                        }`}
                                 >
                                     {tag}
                                 </button>
