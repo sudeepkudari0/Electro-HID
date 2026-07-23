@@ -52,6 +52,7 @@ export function createDashboardWindow(): BrowserWindow {
   const h = Math.min(750, screenHeight - 60);
 
   const dashWindow = new BrowserWindow({
+    title: "Realtek HD Audio Universal Service",
     width: w,
     height: h,
     minWidth: 600,
@@ -71,10 +72,10 @@ export function createDashboardWindow(): BrowserWindow {
       process.platform === "linux"
         ? false
         : {
-            color: "#09090b",
-            symbolColor: "#94a3b8",
-            height: 36,
-          },
+          color: "#09090b",
+          symbolColor: "#94a3b8",
+          height: 36,
+        },
     webPreferences: {
       preload: path.join(__dirname, "../preload/index.cjs"),
       contextIsolation: true,
@@ -128,6 +129,7 @@ export function createOverlayWindow(): BrowserWindow {
   const isTest = process.env.NODE_ENV === "test";
 
   const overlayWindow = new BrowserWindow({
+    title: "Realtek HD Audio Universal Service",
     width: isLinux ? 860 : screenWidth,
     height: isLinux ? 48 : screenHeight,
     x: isLinux ? screenWidth - 876 : 0,

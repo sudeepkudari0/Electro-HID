@@ -216,12 +216,12 @@ export function AnswerPanel({ answers, currentIndex, onNavigate, onClear }: Answ
                                                 </span>
                                                 <button
                                                     onClick={() => navigator.clipboard.writeText(codeString)}
-                                                    className="text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors opacity-0 group-hover:opacity-100"
+                                                    className="text-[10px] text-zinc-500 hover:text-zinc-300 transition-all opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto duration-200"
                                                 >
                                                     Copy
                                                 </button>
                                             </div>
-                                            <pre className="!bg-zinc-900 !m-0 p-3 overflow-x-auto">
+                                            <pre className="!bg-zinc-900 !m-0 p-3 overflow-x-auto w-full max-w-full">
                                                 <code className={`${className || ''} text-xs font-mono leading-relaxed`} {...props}>
                                                     {children}
                                                 </code>

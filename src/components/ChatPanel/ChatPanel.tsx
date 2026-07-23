@@ -104,7 +104,7 @@ function ImageCropper({ src, onCrop, onCancel }: { src: string, onCrop: (cropped
                     <img
                         ref={imageRef}
                         src={`data:image/png;base64,${src}`}
-                        className="max-w-full max-h-[280px] object-contain pointer-events-none"
+                        className="max-w-full max-h-full object-contain pointer-events-none"
                         alt="Crop target"
                         draggable={false}
                     />
@@ -368,7 +368,7 @@ export function ChatPanel({ onClose }: ChatPanelProps) {
                                                             <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider">
                                                                 {lang || 'code'}
                                                             </span>
-                                                            <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity duration-200">
                                                                 <button
                                                                     onClick={async () => {
                                                                         if (isInjecting) {
@@ -392,7 +392,7 @@ export function ChatPanel({ onClose }: ChatPanelProps) {
                                                                 </button>
                                                             </div>
                                                         </div>
-                                                        <pre className="!bg-zinc-950 !m-0 p-3 overflow-x-auto scrollbar-thin">
+                                                        <pre className="!bg-zinc-950 !m-0 p-3 overflow-x-auto scrollbar-thin w-full max-w-full">
                                                             <code className={`${className || ''} text-xs font-mono leading-relaxed text-zinc-200`} {...props}>
                                                                 {children}
                                                             </code>

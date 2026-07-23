@@ -9,10 +9,17 @@ export async function captureScreen(sourceId?: string): Promise<string> {
     try {
         console.log('[ScreenCapture] Starting capture, sourceId:', sourceId);
 
+        const primaryDisplay = screen.getPrimaryDisplay();
+        const { width, height } = primaryDisplay.size;
+        const scaleFactor = primaryDisplay.scaleFactor;
+
         // Get available sources
         const sources = await desktopCapturer.getSources({
             types: ['screen', 'window'],
-            thumbnailSize: screen.getPrimaryDisplay().workAreaSize,
+            thumbnailSize: {
+                width: width * scaleFactor,
+                height: height * scaleFactor
+            },
         });
 
         console.log('[ScreenCapture] Found sources:', sources.length, sources.map(s => ({ id: s.id, name: s.name })));

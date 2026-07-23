@@ -66,3 +66,6 @@ native/jobspy/*.spec
 native/browser-use-apply/venv/
 native/browser-use-apply/__pycache__/
 native/browser-use-apply/*.spec
+
+# Build outputs
+build-out/
