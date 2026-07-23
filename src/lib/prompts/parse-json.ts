@@ -2,6 +2,9 @@
 export interface StructuredTeleprompterAnswer {
     answer?: string;
     reflection?: string;
+    hook?: string;
+    points?: string[];
+    edgeCase?: string;
 }
 
 export function parseProgressiveJson(rawText?: string): StructuredTeleprompterAnswer | null {
@@ -68,7 +71,7 @@ export function parseProgressiveJson(rawText?: string): StructuredTeleprompterAn
     if (!answerVal) {
         // Fallback to legacy hook / points
         const hookMatch = /"(?:hook|Direct Hook|bottomLine|bottom_line|summary)"\s*:\s*"([\s\S]*?)"(?=\s*(?:,\s*"(?:points|Key Points|edgeCase|Edge Case)"|,\s*\}$|^\s*\}$|$))/i.exec(text);
-        
+
         let points: string[] = [];
         const pointsBlockMatch = /"(?:points|Key Points|Key Talking Points|key_points|bullets|items)"\s*:\s*\[([\s\S]*?)(?:\]|$)/i.exec(text);
         if (pointsBlockMatch) {

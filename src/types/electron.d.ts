@@ -216,6 +216,14 @@ interface ElectronAPI {
     onSpeechStarted: (callback: (data: { speaker: string }) => void) => () => void;
     onError: (callback: (data: { error: string }) => void) => () => void;
   };
+
+  hid: {
+    typeText: (text: string) => Promise<{ success: boolean; error?: string; aborted?: boolean }>;
+    stopTyping: () => Promise<{ success: boolean; error?: string }>;
+    startMirroring: () => Promise<{ success: boolean; error?: string }>;
+    stopMirroring: () => Promise<{ success: boolean; error?: string }>;
+    onKeyPressed: (callback: (char: string) => void) => () => void;
+  };
 }
 
 declare global {

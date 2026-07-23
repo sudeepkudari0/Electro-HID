@@ -6,6 +6,8 @@ import path from 'path';
 import fs from 'fs';
 import { spawn } from 'child_process';
 import { getNlpDir, getNlpVenvDir, getNlpVenvPython, findPythonExecutable, nlpServerManager } from './nlp/server-manager';
+import { injectText, stopTyping } from './hid/keyboard-injector';
+import { toggleKeyMirror, startKeyMirror, stopKeyMirror } from './hid/key-mirror';
 
 /**
  * Registers all IPC handlers in the Electron main process.
@@ -41,14 +43,14 @@ export function registerIPCHandlers(): void {
             const https = require('https');
             const url = `https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-${modelName}.bin`;
             const destDir = path.join(app.getPath('userData'), 'whisper-models');
-            
+
             if (!fs.existsSync(destDir)) {
                 fs.mkdirSync(destDir, { recursive: true });
             }
-            
+
             const destPath = path.join(destDir, `ggml-${modelName}.bin`);
             const file = fs.createWriteStream(destPath);
-            
+
             https.get(url, (response: any) => {
                 if (response.statusCode === 301 || response.statusCode === 302) {
                     // Handle redirect
@@ -58,18 +60,18 @@ export function registerIPCHandlers(): void {
                 } else {
                     handleDownload(response);
                 }
-                
+
                 function handleDownload(res: any) {
                     if (res.statusCode !== 200) {
                         file.close();
-                        fs.unlink(destPath, () => {}); // Delete temp file
+                        fs.unlink(destPath, () => { }); // Delete temp file
                         resolve({ success: false, error: `Server returned ${res.statusCode}` });
                         return;
                     }
-                    
+
                     const totalLen = parseInt(res.headers['content-length'] || '0', 10);
                     let downloaded = 0;
-                    
+
                     res.on('data', (chunk: Buffer) => {
                         downloaded += chunk.length;
                         if (totalLen > 0) {
@@ -77,19 +79,19 @@ export function registerIPCHandlers(): void {
                             event.sender.send('whisper:download-progress', { progress: percent });
                         }
                     });
-                    
+
                     res.pipe(file);
-                    
+
                     file.on('finish', () => {
                         file.close();
                         resolve({ success: true });
                     });
                 }
             }).on('error', handleError);
-            
+
             function handleError(err: Error) {
                 file.close();
-                fs.unlink(destPath, () => {}); // Delete temp file
+                fs.unlink(destPath, () => { }); // Delete temp file
                 resolve({ success: false, error: err.message });
             }
         });
@@ -100,13 +102,13 @@ export function registerIPCHandlers(): void {
         return new Promise((resolve) => {
             const exeName = 'moonshine-server.exe';
             let serverExePath: string;
-            
+
             if (app.isPackaged) {
                 serverExePath = path.join(process.resourcesPath, 'whisper', exeName);
             } else {
                 serverExePath = path.join(app.getAppPath(), 'native', 'whisper', exeName);
             }
-            
+
             if (!fs.existsSync(serverExePath)) {
                 resolve({ success: false, error: 'Moonshine server executable not found. Please build it first.' });
                 return;
@@ -175,13 +177,13 @@ export function registerIPCHandlers(): void {
     ipcMain.handle(IPC_CHANNELS.CHECK_STT_SERVER, async (event, engine: 'whisper' | 'moonshine') => {
         const exeName = engine === 'whisper' ? 'whisper-server.exe' : 'moonshine-server.exe';
         let p;
-        
+
         if (app.isPackaged) {
             p = path.join(process.resourcesPath, 'whisper', exeName);
         } else {
             p = path.join(app.getAppPath(), 'native', 'whisper', exeName);
         }
-        
+
         return { exists: fs.existsSync(p) };
     });
 
@@ -322,15 +324,15 @@ export function registerIPCHandlers(): void {
             const { getLLMService } = await import('./llm/llm-service');
             const llmService = getLLMService();
             const requestId = options.requestId || 'default';
-            
+
             const controller = new AbortController();
             activeLlmRequests.set(requestId, controller);
-            
+
             const generateOptions = { ...options, signal: controller.signal };
 
             if (options.stream) {
                 const result = await llmService.generate(generateOptions);
-                
+
                 if (result.stream) {
                     const stream = result.stream;
                     (async () => {
@@ -345,15 +347,15 @@ export function registerIPCHandlers(): void {
                         } catch (error) {
                             if (controller.signal.aborted) return;
                             console.error('IPC: Streaming failed:', error);
-                            event.sender.send(`llm:error:${requestId}`, { 
-                                error: error instanceof Error ? error.message : 'Streaming failed' 
+                            event.sender.send(`llm:error:${requestId}`, {
+                                error: error instanceof Error ? error.message : 'Streaming failed'
                             });
                         } finally {
                             activeLlmRequests.delete(requestId);
                         }
                     })();
                 }
-                
+
                 return {
                     success: true,
                     streaming: true,
@@ -390,7 +392,7 @@ export function registerIPCHandlers(): void {
 
             // Using asteria as default if not configured
             const model = settings.deepgramTtsModel || 'aura-asteria-en';
-            
+
             const response = await fetch(`https://api.deepgram.com/v1/speak?model=${model}`, {
                 method: 'POST',
                 headers: {
@@ -419,13 +421,13 @@ export function registerIPCHandlers(): void {
         }
     });
 
-    
+
     // Ollama: Test connection
     ipcMain.handle(IPC_CHANNELS.TEST_OLLAMA, async () => {
         try {
             const { LLMService } = await import('./llm/llm-service');
             const llmService = new LLMService({ llmProvider: 'ollama', useOllamaOnly: true });
-            
+
             // Try a minimal generation to verify connectivity and model availability
             const result = await llmService.generate({
                 systemPrompt: 'You are a connectivity tester.',
@@ -433,7 +435,7 @@ export function registerIPCHandlers(): void {
                 maxTokens: 10,
                 stream: false,
             });
-            
+
             return { success: true, message: result.text.trim() };
         } catch (error) {
             console.error('IPC: Ollama test failed:', error);
@@ -449,7 +451,7 @@ export function registerIPCHandlers(): void {
         try {
             const { LLMService } = await import('./llm/llm-service');
             const llmService = new LLMService({ llmProvider: 'openai' });
-            
+
             // Try a minimal generation to verify connectivity and model availability
             const result = await llmService.generate({
                 systemPrompt: 'You are a connectivity tester.',
@@ -457,7 +459,7 @@ export function registerIPCHandlers(): void {
                 maxTokens: 10,
                 stream: false,
             });
-            
+
             return { success: true, message: result.text.trim() };
         } catch (error) {
             console.error('IPC: OpenAI test failed:', error);
@@ -678,10 +680,10 @@ Be concise but thorough. Use bullet points and code blocks where appropriate.`;
             const { saveSettings } = await import('./settings');
             const { resetLLMService } = await import('./llm/llm-service');
             const updated = saveSettings(settings);
-            
+
             // Clear the old singleton to force re-reading new keys
             resetLLMService();
-            
+
             return { success: true, settings: updated };
         } catch (error) {
             return { success: false, error: String(error) };
@@ -692,21 +694,21 @@ Be concise but thorough. Use bullet points and code blocks where appropriate.`;
     ipcMain.handle(IPC_CHANNELS.GET_AVAILABLE_MODELS, async () => {
         try {
             const dirs = [
-                app.isPackaged 
+                app.isPackaged
                     ? path.join(process.resourcesPath, 'whisper', 'models')
                     : path.join(app.getAppPath(), 'native', 'whisper', 'models'),
                 path.join(app.getPath('userData'), 'whisper-models')
             ];
-            
+
             const allModels = new Set<string>();
             for (const dir of dirs) {
                 if (fs.existsSync(dir)) {
                     const files = fs.readdirSync(dir);
                     files.filter((f: string) => f.startsWith('ggml-') && f.endsWith('.bin'))
-                         .forEach((f: string) => allModels.add(f.replace('ggml-', '').replace('.bin', '')));
+                        .forEach((f: string) => allModels.add(f.replace('ggml-', '').replace('.bin', '')));
                 }
             }
-            
+
             return { success: true, models: Array.from(allModels) };
         } catch (error) {
             console.error('Failed to get available models:', error);
@@ -1169,6 +1171,28 @@ Be concise but thorough. Use bullet points and code blocks where appropriate.`;
             return { success: false, error: String(error) };
         }
     });
+
+    // HID / Keyboard injection
+    ipcMain.handle(IPC_CHANNELS.HID_TYPE_TEXT, async (event, text: string) => {
+        return await injectText(text);
+    });
+
+    ipcMain.handle(IPC_CHANNELS.HID_STOP_TYPING, async () => {
+        stopTyping();
+        return { success: true };
+    });
+
+    // Keystroke Mirroring
+    ipcMain.handle(IPC_CHANNELS.HID_MIRROR_START, async (event) => {
+        const win = BrowserWindow.fromWebContents(event.sender);
+        if (win) startKeyMirror(win);
+        return { success: !!win };
+    });
+
+    ipcMain.handle(IPC_CHANNELS.HID_MIRROR_STOP, async () => {
+        stopKeyMirror();
+        return { success: true };
+    });
 }
 
 /**
@@ -1214,5 +1238,11 @@ export function registerGlobalShortcuts(mainWindow: BrowserWindow): void {
     // Ctrl+Shift+Down → Decrease opacity
     globalShortcut.register('CommandOrControl+Shift+Down', () => {
         mainWindow.webContents.send('shortcut:opacity-down');
+    });
+
+    // Ctrl+Shift+M → Toggle Keystroke Mirroring
+    globalShortcut.register('CommandOrControl+Shift+M', () => {
+        const isNowMirroring = toggleKeyMirror(mainWindow);
+        mainWindow.webContents.send('shortcut:toggle-mirroring', { isMirroring: isNowMirroring });
     });
 }

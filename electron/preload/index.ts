@@ -26,6 +26,11 @@ const IPC_CHANNELS = {
     PROFILE_SAVE: 'profile:save',
     PROFILE_LOAD: 'profile:load',
     CHECK_STT_SERVER: 'server:check-stt',
+    HID_TYPE_TEXT: 'hid:type-text',
+    HID_STOP_TYPING: 'hid:stop-typing',
+    HID_MIRROR_START: 'hid:mirror-start',
+    HID_MIRROR_STOP: 'hid:mirror-stop',
+    HID_KEY_PRESSED: 'hid:key-pressed',
 } as const;
 
 // Expose protected methods to renderer process
@@ -128,7 +133,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
             ipcRenderer.on(`llm:chunk:${requestId}`, chunkHandler);
             ipcRenderer.once(`llm:done:${requestId}`, doneHandler);
             ipcRenderer.once(`llm:error:${requestId}`, errorHandler);
-            
+
             return await ipcRenderer.invoke('llm:generate', { ...options, requestId });
         }
         return await ipcRenderer.invoke('llm:generate', options);
@@ -155,27 +160,27 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getSettings: async () => {
         return await ipcRenderer.invoke(IPC_CHANNELS.GET_SETTINGS);
     },
-    
+
     updateSettings: async (settings: any) => {
         return await ipcRenderer.invoke(IPC_CHANNELS.UPDATE_SETTINGS, settings);
     },
-    
+
     getAvailableModels: async () => {
         return await ipcRenderer.invoke(IPC_CHANNELS.GET_AVAILABLE_MODELS);
     },
-    
+
     downloadMoonshineModel: async (modelName: string) => {
         return await ipcRenderer.invoke(IPC_CHANNELS.DOWNLOAD_MOONSHINE_MODEL, modelName);
     },
-    
+
     checkSttServer: async (engine: 'whisper' | 'moonshine') => {
         return await ipcRenderer.invoke(IPC_CHANNELS.CHECK_STT_SERVER, engine);
     },
-    
+
     testOllama: async () => {
         return await ipcRenderer.invoke(IPC_CHANNELS.TEST_OLLAMA);
     },
-    
+
     testOpenAI: async () => {
         return await ipcRenderer.invoke(IPC_CHANNELS.TEST_OPENAI);
     },
@@ -205,7 +210,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
 
     // Shortcut listeners — renderer subscribes to global shortcut events
-    onShortcut: (channel: string, callback: () => void) => {
+    onShortcut: (channel: string, callback: (data?: any) => void) => {
         const validChannels = [
             'shortcut:capture-screen',
             'shortcut:generate-answer',
@@ -215,12 +220,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
             'shortcut:toggle-teleprompter',
             'shortcut:opacity-up',
             'shortcut:opacity-down',
+            'shortcut:toggle-mirroring',
         ];
         if (validChannels.includes(channel)) {
-            ipcRenderer.on(channel, callback);
-            return () => ipcRenderer.removeListener(channel, callback);
+            const handler = (_event: any, data: any) => callback(data);
+            ipcRenderer.on(channel, handler);
+            return () => ipcRenderer.removeListener(channel, handler);
         }
-        return () => {};
+        return () => { };
     },
 
     // Career Hub APIs
@@ -273,6 +280,27 @@ contextBridge.exposeInMainWorld('electronAPI', {
             const handler = (_event: any, data: { isMaximized: boolean }) => callback(data);
             ipcRenderer.on('window:state-changed', handler);
             return () => ipcRenderer.removeListener('window:state-changed', handler);
+        }
+    },
+
+    // HID / Keyboard injection API
+    hid: {
+        typeText: async (text: string) => {
+            return await ipcRenderer.invoke(IPC_CHANNELS.HID_TYPE_TEXT, text);
+        },
+        stopTyping: async () => {
+            return await ipcRenderer.invoke(IPC_CHANNELS.HID_STOP_TYPING);
+        },
+        startMirroring: async () => {
+            return await ipcRenderer.invoke(IPC_CHANNELS.HID_MIRROR_START);
+        },
+        stopMirroring: async () => {
+            return await ipcRenderer.invoke(IPC_CHANNELS.HID_MIRROR_STOP);
+        },
+        onKeyPressed: (callback: (char: string) => void) => {
+            const handler = (_event: any, char: string) => callback(char);
+            ipcRenderer.on(IPC_CHANNELS.HID_KEY_PRESSED, handler);
+            return () => ipcRenderer.removeListener(IPC_CHANNELS.HID_KEY_PRESSED, handler);
         }
     },
 

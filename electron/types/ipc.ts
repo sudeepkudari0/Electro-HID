@@ -105,4 +105,11 @@ export const IPC_CHANNELS = {
     DEEPGRAM_START_STREAM: 'deepgram:start-stream',
     DEEPGRAM_SEND_AUDIO: 'deepgram:send-audio',
     DEEPGRAM_STOP_STREAM: 'deepgram:stop-stream',
+    // HID / Keyboard injection
+    HID_TYPE_TEXT: 'hid:type-text',
+    HID_STOP_TYPING: 'hid:stop-typing',
+    // Keystroke Mirroring
+    HID_MIRROR_START: 'hid:mirror-start',
+    HID_MIRROR_STOP: 'hid:mirror-stop',
+    HID_KEY_PRESSED: 'hid:key-pressed',
 } as const;

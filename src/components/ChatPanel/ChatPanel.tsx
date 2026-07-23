@@ -132,6 +132,8 @@ export function ChatPanel({ onClose }: ChatPanelProps) {
     const [rawCapture, setRawCapture] = useState<string | null>(null);
     const [attachedImage, setAttachedImage] = useState<string | null>(null);
     const [isCapturing, setIsCapturing] = useState(false);
+    const [isInjecting, setIsInjecting] = useState(false);
+    const [isMirroring, setIsMirroring] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     const { isGenerating, generateResponse } = useLLM({
@@ -145,6 +147,27 @@ export function ChatPanel({ onClose }: ChatPanelProps) {
     useEffect(() => {
         scrollToBottom();
     }, [messages]);
+
+    useEffect(() => {
+        // Listen for the global shortcut toggle
+        const cleanupShortcut = window.electronAPI.onShortcut('shortcut:toggle-mirroring', (data?: { isMirroring: boolean }) => {
+            setIsMirroring(!!data?.isMirroring);
+        });
+
+        // Listen for mirrored keystrokes
+        const cleanupKey = window.electronAPI.hid.onKeyPressed((char: string) => {
+            if (char === 'BACKSPACE') {
+                setInput(prev => prev.slice(0, -1));
+            } else {
+                setInput(prev => prev + char);
+            }
+        });
+
+        return () => {
+            cleanupShortcut();
+            cleanupKey();
+        };
+    }, []);
 
     const handleAttachCapture = async () => {
         setIsCapturing(true);
@@ -234,6 +257,12 @@ export function ChatPanel({ onClose }: ChatPanelProps) {
                 <div className="flex items-center gap-2">
                     <Bot className="w-5 h-5 text-indigo-400" />
                     <h2 className="text-sm font-semibold text-white tracking-wide">AI Assistant</h2>
+                    {isMirroring && (
+                        <span className="ml-2 px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 text-[10px] uppercase font-bold flex items-center gap-1 animate-pulse">
+                            <span className="w-1.5 h-1.5 rounded-full bg-red-400"></span>
+                            Mirroring ON
+                        </span>
+                    )}
                 </div>
                 <button
                     onClick={onClose}
@@ -339,12 +368,29 @@ export function ChatPanel({ onClose }: ChatPanelProps) {
                                                             <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider">
                                                                 {lang || 'code'}
                                                             </span>
-                                                            <button
-                                                                onClick={() => navigator.clipboard.writeText(codeString)}
-                                                                className="text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors opacity-0 group-hover:opacity-100"
-                                                            >
-                                                                Copy
-                                                            </button>
+                                                            <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                <button
+                                                                    onClick={async () => {
+                                                                        if (isInjecting) {
+                                                                            await window.electronAPI.hid.stopTyping();
+                                                                            setIsInjecting(false);
+                                                                        } else {
+                                                                            setIsInjecting(true);
+                                                                            await window.electronAPI.hid.typeText(codeString);
+                                                                            setIsInjecting(false);
+                                                                        }
+                                                                    }}
+                                                                    className={`text-[10px] ${isInjecting ? 'text-red-400 hover:text-red-300' : 'text-emerald-500 hover:text-emerald-400'} font-medium transition-colors flex items-center gap-1`}
+                                                                >
+                                                                    {isInjecting ? 'Stop Typing' : 'Inject'}
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => navigator.clipboard.writeText(codeString)}
+                                                                    className="text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors"
+                                                                >
+                                                                    Copy
+                                                                </button>
+                                                            </div>
                                                         </div>
                                                         <pre className="!bg-zinc-950 !m-0 p-3 overflow-x-auto scrollbar-thin">
                                                             <code className={`${className || ''} text-xs font-mono leading-relaxed text-zinc-200`} {...props}>
