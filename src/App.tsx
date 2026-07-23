@@ -1097,7 +1097,6 @@ function App(): JSX.Element {
         onToggleExpanded={toggleExpanded}
         onToggleRecording={handleToggleRecording}
         onCaptureScreen={handleCaptureScreen}
-        onRegionCapture={handleRegionCapture}
         onGenerateAnswer={handleGenerateAnswer}
         onClearTranscript={handleClearTranscript}
         onToggleChat={toggleChat}
