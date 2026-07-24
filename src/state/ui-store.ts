@@ -14,6 +14,7 @@ interface UIState {
     widgetOpacity: number;
     isDeveloperMode: boolean;
     safeCursorMode: boolean;
+    isHidden: boolean;
 
     // Actions
     toggleExpanded: () => void;
@@ -33,6 +34,7 @@ interface UIState {
     setWidgetOpacity: (opacity: number) => void;
     toggleDeveloperMode: () => void;
     setSafeCursorMode: (val: boolean) => void;
+    toggleHidden: () => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -49,6 +51,7 @@ export const useUIStore = create<UIState>((set) => ({
     widgetOpacity: 100,
     isDeveloperMode: false,
     safeCursorMode: true,
+    isHidden: false,
 
     // Actions
     toggleExpanded: () =>
@@ -132,4 +135,5 @@ export const useUIStore = create<UIState>((set) => ({
     toggleDeveloperMode: () => set((state) => ({ isDeveloperMode: !state.isDeveloperMode })),
 
     setSafeCursorMode: (val) => set({ safeCursorMode: val }),
+    toggleHidden: () => set((state) => ({ isHidden: !state.isHidden })),
 }));

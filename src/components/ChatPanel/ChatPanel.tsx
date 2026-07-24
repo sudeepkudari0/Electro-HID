@@ -148,6 +148,20 @@ export function ChatPanel({ onClose }: ChatPanelProps) {
         scrollToBottom();
     }, [messages]);
 
+    const handleAttachCapture = async () => {
+        setIsCapturing(true);
+        try {
+            const result = await window.electronAPI.captureScreen();
+            if (result.success && result.imageData) {
+                setRawCapture(result.imageData);
+            }
+        } catch (error) {
+            console.error('Failed to capture screen:', error);
+        } finally {
+            setIsCapturing(false);
+        }
+    };
+
     useEffect(() => {
         // Listen for the global shortcut toggle
         const cleanupShortcut = window.electronAPI.onShortcut('shortcut:toggle-mirroring', (data?: { isMirroring: boolean }) => {
@@ -163,25 +177,18 @@ export function ChatPanel({ onClose }: ChatPanelProps) {
             }
         });
 
+        // Listen for screen capture shortcut when chat panel is open (opens cropper)
+        const handleShortcutCapture = () => {
+            handleAttachCapture();
+        };
+        window.addEventListener('chat:capture-screen', handleShortcutCapture);
+
         return () => {
             cleanupShortcut();
             cleanupKey();
+            window.removeEventListener('chat:capture-screen', handleShortcutCapture);
         };
     }, []);
-
-    const handleAttachCapture = async () => {
-        setIsCapturing(true);
-        try {
-            const result = await window.electronAPI.captureScreen();
-            if (result.success && result.imageData) {
-                setRawCapture(result.imageData);
-            }
-        } catch (error) {
-            console.error('Failed to capture screen:', error);
-        } finally {
-            setIsCapturing(false);
-        }
-    };
 
     const handleSend = async () => {
         if ((!input.trim() && !attachedImage) || isGenerating) return;

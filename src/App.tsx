@@ -1,6 +1,5 @@
 import { useCallback, useRef, useEffect, useState } from "react";
 import { FloatingWidget } from "./components/FloatingWidget/FloatingWidget";
-import { RegionSelector } from "./components/RegionSelector/RegionSelector";
 import { useWhisper } from "./hooks/useWhisper";
 import {
   useMixedAudioRecorder,
@@ -71,6 +70,7 @@ function App(): JSX.Element {
     togglePractice,
     setCapturing,
     toggleTeleprompterMode,
+    toggleHidden,
   } = useUIStore();
 
   // ─── App-level state ───
@@ -986,7 +986,11 @@ function App(): JSX.Element {
     if (window.electronAPI?.onShortcut) {
       unsubscribers.push(
         window.electronAPI.onShortcut("shortcut:capture-screen", () => {
-          handleCaptureScreen();
+          if (useUIStore.getState().isChatOpen) {
+            window.dispatchEvent(new CustomEvent('chat:capture-screen'));
+          } else {
+            handleCaptureScreen();
+          }
         }),
       );
       unsubscribers.push(
@@ -1005,8 +1009,13 @@ function App(): JSX.Element {
         }),
       );
       unsubscribers.push(
-        window.electronAPI.onShortcut("shortcut:region-capture", () => {
-          handleRegionCapture();
+        window.electronAPI.onShortcut("shortcut:toggle-chat", () => {
+          toggleChat();
+        }),
+      );
+      unsubscribers.push(
+        window.electronAPI.onShortcut("shortcut:toggle-hide", () => {
+          toggleHidden();
         }),
       );
       unsubscribers.push(
@@ -1031,120 +1040,44 @@ function App(): JSX.Element {
     return () => {
       unsubscribers.forEach((unsub) => unsub());
     };
-  }, [conversation, answers.length, toggleTeleprompterMode]);
-
-  // ─── Region Capture ───
-  const [regionSelectState, setRegionSelectState] = useState<{
-    screenshotData: string;
-  } | null>(null);
-
-  const handleRegionCapture = async () => {
-    try {
-      const captureResult = await window.electronAPI.captureScreen();
-      if (captureResult.success && captureResult.imageData) {
-        setRegionSelectState({ screenshotData: captureResult.imageData });
-      }
-    } catch (error) {
-      console.error("Region capture failed:", error);
-    }
-  };
-
-  const handleRegionResult = async (croppedImageData: string) => {
-    setRegionSelectState(null);
-    setCapturing(true);
-    try {
-      const prompt = isCodeMode
-        ? getCodeAnalysisPrompt({
-          resume: profile.resume,
-          jobDescription: profile.jobDescription,
-        })
-        : undefined;
-
-      const newAnswer: Answer = {
-        id: Date.now().toString(),
-        source: "screen-capture",
-        question: isCodeMode
-          ? "💻 Code Analysis (Region)"
-          : "🔍 Region Analysis",
-        answer: "",
-        timestamp: new Date(),
-        isStreaming: true,
-        detectedType: isCodeMode ? "coding" : undefined,
-      };
-      addAnswer(newAnswer);
-      setExpanded(true);
-
-      let streamedAnswer = "";
-      const userPrompt =
-        prompt?.user ||
-        "Analyze this screenshot region. Extract questions, code, or information and provide a helpful response.";
-
-      await generateResponse(
-        userPrompt,
-        undefined,
-        (chunk) => {
-          streamedAnswer += chunk;
-          updateAnswer(newAnswer.id, {
-            answer: streamedAnswer,
-            isStreaming: true,
-          });
-        },
-        croppedImageData,
-      );
-      updateAnswer(newAnswer.id, { isStreaming: false });
-    } catch (error) {
-      console.error("Region analysis failed:", error);
-    } finally {
-      setCapturing(false);
-    }
-  };
-
+  }, [conversation, answers.length, toggleTeleprompterMode, toggleChat, toggleHidden, toggleExpanded]);
   // ─── Render ───
   return (
-    <>
-      <FloatingWidget
-        isExpanded={isExpanded}
-        isChatOpen={isChatOpen}
-        isHistoryOpen={isHistoryOpen}
-        isPracticeOpen={isPracticeOpen}
-        isRecording={isRecording}
-        isCapturing={isCapturing}
-        isGenerating={isGenerating}
-        isTeleprompterMode={isTeleprompterMode}
-        sessionTime={sessionTime}
-        conversation={conversation}
-        isModelLoading={isModelLoading}
-        modelError={modelError}
-        candidateQuestions={candidateQuestions}
-        detectedQuestions={detectedQuestions}
-        expandedQuestionId={expandedQuestionId}
-        autoDetectionEnabled={autoDetectionEnabled}
-        sttEngine={sttEngine}
-        sttModel={sttModel}
-        audioLevels={audioLevels}
-        onToggleExpanded={toggleExpanded}
-        onToggleRecording={handleToggleRecording}
-        onCaptureScreen={handleCaptureScreen}
-        onGenerateAnswer={handleGenerateAnswer}
-        onClearTranscript={handleClearTranscript}
-        onToggleChat={toggleChat}
-        onToggleHistory={toggleHistory}
-        onTogglePractice={togglePractice}
-        onClose={handleClose}
-        onPickQuestion={handlePickQuestion}
-        onDismissCandidate={removeCandidateQuestion}
-        onSelectOption={() => { }}
-        onClearDetectedQuestions={handleClearAll}
-        onToggleAutoDetection={handleToggleAutoDetection}
-      />
-      {regionSelectState && (
-        <RegionSelector
-          screenshotData={regionSelectState.screenshotData}
-          onCapture={handleRegionResult}
-          onCancel={() => setRegionSelectState(null)}
-        />
-      )}
-    </>
+    <FloatingWidget
+      isExpanded={isExpanded}
+      isChatOpen={isChatOpen}
+      isHistoryOpen={isHistoryOpen}
+      isPracticeOpen={isPracticeOpen}
+      isRecording={isRecording}
+      isCapturing={isCapturing}
+      isGenerating={isGenerating}
+      isTeleprompterMode={isTeleprompterMode}
+      sessionTime={sessionTime}
+      conversation={conversation}
+      isModelLoading={isModelLoading}
+      modelError={modelError}
+      candidateQuestions={candidateQuestions}
+      detectedQuestions={detectedQuestions}
+      expandedQuestionId={expandedQuestionId}
+      autoDetectionEnabled={autoDetectionEnabled}
+      sttEngine={sttEngine}
+      sttModel={sttModel}
+      audioLevels={audioLevels}
+      onToggleExpanded={toggleExpanded}
+      onToggleRecording={handleToggleRecording}
+      onCaptureScreen={handleCaptureScreen}
+      onGenerateAnswer={handleGenerateAnswer}
+      onClearTranscript={handleClearTranscript}
+      onToggleChat={toggleChat}
+      onToggleHistory={toggleHistory}
+      onTogglePractice={togglePractice}
+      onClose={handleClose}
+      onPickQuestion={handlePickQuestion}
+      onDismissCandidate={removeCandidateQuestion}
+      onSelectOption={() => { }}
+      onClearDetectedQuestions={handleClearAll}
+      onToggleAutoDetection={handleToggleAutoDetection}
+    />
   );
 }
 

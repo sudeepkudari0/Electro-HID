@@ -99,6 +99,7 @@ export function FloatingWidget({
 
     // Safe cursor mode states
     const safeCursorMode = useUIStore((state) => state.safeCursorMode);
+    const isHidden = useUIStore((state) => state.isHidden);
     const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
     const [isHovered, setIsHovered] = useState(false);
     const [cursorType, setCursorType] = useState('default');
@@ -249,11 +250,16 @@ export function FloatingWidget({
     useEffect(() => {
         if (isLinux) return;
 
+        if (isHidden) {
+            window.electronAPI?.setIgnoreMouseEvents(true);
+            return;
+        }
+
         const el = widgetRef.current;
         if (!el) return;
 
         const handleEnter = () => {
-            if (!isTeleprompterMode) {
+            if (!isTeleprompterMode && !isHidden) {
                 window.electronAPI?.setIgnoreMouseEvents(false);
             }
         };
@@ -273,7 +279,7 @@ export function FloatingWidget({
             el.removeEventListener('mouseenter', handleEnter);
             el.removeEventListener('mouseleave', handleLeave);
         };
-    }, [isTeleprompterMode, isLinux]);
+    }, [isTeleprompterMode, isLinux, isHidden]);
 
     // Auto-expand when new candidate questions arrive
     useEffect(() => {
@@ -301,6 +307,7 @@ export function FloatingWidget({
                 onMouseEnter={() => setIsHovered(true)}
                 onMouseLeave={() => setIsHovered(false)}
                 style={{
+                    ...(isHidden ? { display: 'none' } : {}),
                     ...(isLinux ? {
                         position: 'relative',
                         top: 0,

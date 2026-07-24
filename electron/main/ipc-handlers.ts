@@ -1227,9 +1227,14 @@ export function registerGlobalShortcuts(mainWindow: BrowserWindow): void {
         mainWindow.webContents.send('shortcut:toggle-recording');
     });
 
-    // Ctrl+Shift+A → Region capture
-    globalShortcut.register('CommandOrControl+Shift+A', () => {
-        mainWindow.webContents.send('shortcut:region-capture');
+    // Ctrl+Shift+C → Toggle Chat Panel
+    globalShortcut.register('CommandOrControl+Shift+C', () => {
+        mainWindow.webContents.send('shortcut:toggle-chat');
+    });
+
+    // Ctrl+Shift+X → Toggle Hide Widget
+    globalShortcut.register('CommandOrControl+Shift+X', () => {
+        mainWindow.webContents.send('shortcut:toggle-hide');
     });
 
     // Ctrl+Shift+T → Toggle teleprompter mode

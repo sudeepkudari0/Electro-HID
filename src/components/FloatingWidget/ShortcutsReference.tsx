@@ -9,18 +9,15 @@ const SHORTCUTS = [
     { category: 'Recording & Capture', items: [
         { keys: ['Ctrl', 'Shift', 'R'], action: 'Toggle Recording' },
         { keys: ['Ctrl', 'Shift', 'S'], action: 'Capture Full Screen' },
-        { keys: ['Ctrl', 'Shift', 'A'], action: 'Region Capture' },
         { keys: ['Ctrl', 'Shift', 'G'], action: 'Generate Answer' },
     ]},
     { category: 'Navigation & View', items: [
         { keys: ['Ctrl', 'Shift', 'H'], action: 'Toggle Widget' },
+        { keys: ['Ctrl', 'Shift', 'C'], action: 'Toggle Chat Panel' },
+        { keys: ['Ctrl', 'Shift', 'X'], action: 'Hide/Show Widget' },
         { keys: ['Ctrl', 'Shift', '↑'], action: 'Increase Opacity' },
         { keys: ['Ctrl', 'Shift', '↓'], action: 'Decrease Opacity' },
         { keys: ['Esc'], action: 'Close Current Panel' },
-    ]},
-    { category: 'Region Selector', items: [
-        { keys: ['Enter'], action: 'Confirm Selection' },
-        { keys: ['Esc'], action: 'Cancel Selection' },
     ]},
 ];
 
