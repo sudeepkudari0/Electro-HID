@@ -13,6 +13,7 @@ interface UIState {
     isTeleprompterMode: boolean;
     widgetOpacity: number;
     isDeveloperMode: boolean;
+    safeCursorMode: boolean;
 
     // Actions
     toggleExpanded: () => void;
@@ -31,6 +32,7 @@ interface UIState {
     toggleTeleprompterMode: () => void;
     setWidgetOpacity: (opacity: number) => void;
     toggleDeveloperMode: () => void;
+    setSafeCursorMode: (val: boolean) => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -46,6 +48,7 @@ export const useUIStore = create<UIState>((set) => ({
     isTeleprompterMode: false,
     widgetOpacity: 100,
     isDeveloperMode: false,
+    safeCursorMode: true,
 
     // Actions
     toggleExpanded: () =>
@@ -127,4 +130,6 @@ export const useUIStore = create<UIState>((set) => ({
     setWidgetOpacity: (opacity) => set({ widgetOpacity: opacity }),
 
     toggleDeveloperMode: () => set((state) => ({ isDeveloperMode: !state.isDeveloperMode })),
+
+    setSafeCursorMode: (val) => set({ safeCursorMode: val }),
 }));

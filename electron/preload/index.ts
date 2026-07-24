@@ -230,6 +230,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
         return () => { };
     },
 
+    onSettingsUpdated: (callback: (settings: any) => void) => {
+        const handler = (_event: any, settings: any) => callback(settings);
+        ipcRenderer.on('settings:updated', handler);
+        return () => {
+            ipcRenderer.removeListener('settings:updated', handler);
+        };
+    },
+
     // Career Hub APIs
     careerHub: {
         saveJobs: async (jobs: any[]) => ipcRenderer.invoke('career:jobs:save', jobs),

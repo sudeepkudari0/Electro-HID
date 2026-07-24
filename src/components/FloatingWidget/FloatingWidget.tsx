@@ -97,6 +97,73 @@ export function FloatingWidget({
     const prevCandidateCount = useRef(candidateQuestions.length);
     const [selectedSession, setSelectedSession] = useState<any>(null);
 
+    // Safe cursor mode states
+    const safeCursorMode = useUIStore((state) => state.safeCursorMode);
+    const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+    const [isHovered, setIsHovered] = useState(false);
+    const [cursorType, setCursorType] = useState('default');
+
+    const updateCursorType = useCallback((el: HTMLElement | null) => {
+        if (!el) {
+            setCursorType('default');
+            return;
+        }
+        let current: HTMLElement | null = el;
+        while (current && current !== document.body) {
+            if (current.classList.contains('resize-handle-left')) {
+                setCursorType('ew-resize');
+                return;
+            }
+            if (current.classList.contains('resize-handle-bottom')) {
+                setCursorType('ns-resize');
+                return;
+            }
+            if (current.classList.contains('resize-handle-bottom-left')) {
+                setCursorType('nesw-resize');
+                return;
+            }
+            if (
+                current.classList.contains('drag-handle-teleprompter') || 
+                current.id === 'widget-header' ||
+                current.classList.contains('widget-header')
+            ) {
+                setCursorType('grab');
+                return;
+            }
+            if (
+                current.tagName === 'INPUT' || 
+                current.tagName === 'TEXTAREA' || 
+                current.classList.contains('select-text') || 
+                current.classList.contains('selectable-text')
+            ) {
+                setCursorType('text');
+                return;
+            }
+            if (
+                current.tagName === 'BUTTON' ||
+                current.tagName === 'A' ||
+                current.tagName === 'SELECT' ||
+                current.classList.contains('toggle-switch') ||
+                current.classList.contains('clickable') ||
+                current.classList.contains('cursor-pointer') ||
+                current.getAttribute('role') === 'button' ||
+                (current as any).onclick
+            ) {
+                setCursorType('pointer');
+                return;
+            }
+            current = current.parentElement;
+        }
+        setCursorType('default');
+    }, []);
+
+    const handleMouseMove = (e: React.MouseEvent) => {
+        setMousePos({ x: e.clientX, y: e.clientY });
+        if (safeCursorMode) {
+            updateCursorType(e.target as HTMLElement);
+        }
+    };
+
     // Auto-scroll live transcript to the right as text grows
     useEffect(() => {
         if (liveTranscriptRef.current) {
@@ -228,8 +295,11 @@ export function FloatingWidget({
         <div className={`fixed top-0 right-0 w-full h-full select-none z-50 ${isLinux ? '' : 'pointer-events-none'}`}>
             <div
                 ref={widgetRef}
-                className={`widget ${isLinux ? '' : 'pointer-events-auto'} ${isExpanded ? 'widget--expanded' : 'widget--collapsed'} ${isTeleprompterMode ? 'widget--teleprompter' : ''}`}
+                className={`widget ${isLinux ? '' : 'pointer-events-auto'} ${isExpanded ? 'widget--expanded' : 'widget--collapsed'} ${isTeleprompterMode ? 'widget--teleprompter' : ''} ${safeCursorMode ? 'widget-cursor-safe' : ''}`}
                 id="floating-widget"
+                onMouseMove={handleMouseMove}
+                onMouseEnter={() => setIsHovered(true)}
+                onMouseLeave={() => setIsHovered(false)}
                 style={{
                     ...(isLinux ? {
                         position: 'relative',
@@ -415,6 +485,15 @@ export function FloatingWidget({
                     )}
                 </div>
             </div>
+            {safeCursorMode && isHovered && (
+                <div
+                    className={`custom-html-cursor custom-html-cursor--${cursorType}`}
+                    style={{
+                        left: `${mousePos.x}px`,
+                        top: `${mousePos.y}px`,
+                    }}
+                />
+            )}
         </div>
     );
 }

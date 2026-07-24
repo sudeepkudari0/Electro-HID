@@ -195,6 +195,7 @@ interface ElectronAPI {
   };
 
   onShortcut: (channel: string, callback: () => void) => () => void;
+  onSettingsUpdated: (callback: (settings: any) => void) => () => void;
 
   windowControl: {
     minimize: () => Promise<{ success: boolean; error?: string }>;

@@ -60,7 +60,8 @@ export function SettingsPanel({ onClose, onSettingsChanged }: SettingsPanelProps
         tailorModel: 'gemini-2.0-flash',
         applyLlmProvider: 'openai' as 'ollama' | 'openai' | 'gemini' | 'groq' | 'mistral',
         applyModel: 'gpt-4o-mini',
-        micDeviceId: 'default'
+        micDeviceId: 'default',
+        safeCursorMode: true
     });
     const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
     const [isTesting, setIsTesting] = useState(false);
@@ -316,7 +317,8 @@ export function SettingsPanel({ onClose, onSettingsChanged }: SettingsPanelProps
                     tailorModel: s.tailorModel || 'gemini-2.0-flash',
                     applyLlmProvider: s.applyLlmProvider || 'openai',
                     applyModel: s.applyModel || 'gpt-4o-mini',
-                    micDeviceId: s.micDeviceId || 'default'
+                    micDeviceId: s.micDeviceId || 'default',
+                    safeCursorMode: s.safeCursorMode !== false
                 });
 
                 // Fetch cloud models silently with loaded keys
@@ -611,6 +613,26 @@ export function SettingsPanel({ onClose, onSettingsChanged }: SettingsPanelProps
                                      </button>
                                  </div>
                              </div>
+                             <div className="border-t border-zinc-800 pt-4">
+                                  <div className="flex items-center justify-between mb-2">
+                                      <div>
+                                          <h3 className="text-sm font-semibold text-white">Safe Cursor Mode</h3>
+                                          <p className="text-[10px] text-zinc-400">
+                                              Hides hardware cursor and renders custom cursor to prevent revealing hidden widget during screen sharing
+                                          </p>
+                                      </div>
+                                      <button
+                                          onClick={() => setSettings({ ...settings, safeCursorMode: !settings.safeCursorMode })}
+                                          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${
+                                              settings.safeCursorMode ? 'bg-indigo-600' : 'bg-zinc-700'
+                                          }`}
+                                      >
+                                          <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                                              settings.safeCursorMode ? 'translate-x-5' : 'translate-x-1'
+                                          }`} />
+                                      </button>
+                                  </div>
+                              </div>
                         </div>
                     )}
 

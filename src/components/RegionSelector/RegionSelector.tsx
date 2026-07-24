@@ -1,4 +1,5 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react';
+import { useUIStore } from '../../state';
 
 interface RegionSelectorProps {
     onCapture: (croppedImageData: string) => void;
@@ -18,6 +19,8 @@ export const RegionSelector: React.FC<RegionSelectorProps> = ({ onCapture, onCan
     const [isSelecting, setIsSelecting] = useState(false);
     const [selection, setSelection] = useState<SelectionRect | null>(null);
     const imgRef = useRef<HTMLImageElement | null>(null);
+    const safeCursorMode = useUIStore((state) => state.safeCursorMode);
+    const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
     // Disable click-through while region selector is active (full-screen overlay)
     // On Linux, click-through is not used so skip this entirely
@@ -104,6 +107,9 @@ export const RegionSelector: React.FC<RegionSelectorProps> = ({ onCapture, onCan
     };
 
     const handleMouseMove = (e: React.MouseEvent) => {
+        if (safeCursorMode) {
+            setMousePos({ x: e.clientX, y: e.clientY });
+        }
         if (!isSelecting || !selection) return;
         setSelection(prev => prev ? { ...prev, endX: e.clientX, endY: e.clientY } : null);
     };
@@ -162,7 +168,11 @@ export const RegionSelector: React.FC<RegionSelectorProps> = ({ onCapture, onCan
         Math.abs(selection.endY - selection.startY) > 10;
 
     return (
-        <div className="fixed inset-0 z-[9999] cursor-crosshair" style={{ pointerEvents: 'auto' }}>
+        <div 
+            className={`fixed inset-0 z-[9999] ${safeCursorMode ? 'cursor-none' : 'cursor-crosshair'}`} 
+            style={{ pointerEvents: 'auto' }}
+            onMouseMove={handleMouseMove}
+        >
             <canvas
                 ref={canvasRef}
                 className="absolute inset-0"
@@ -191,6 +201,29 @@ export const RegionSelector: React.FC<RegionSelectorProps> = ({ onCapture, onCan
                     >
                         Cancel
                     </button>
+                </div>
+            )}
+
+            {/* Custom Crosshair Cursor for Safe Mode */}
+            {safeCursorMode && (
+                <div 
+                    style={{
+                        position: 'fixed',
+                        left: mousePos.x,
+                        top: mousePos.y,
+                        pointerEvents: 'none',
+                        zIndex: 100000,
+                        transform: 'translate(-50%, -50%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                    }}
+                >
+                    {/* Crosshair lines */}
+                    <div style={{ position: 'absolute', width: '16px', height: '1.5px', backgroundColor: '#06b6d4', boxShadow: '0 0 4px rgba(6, 182, 212, 0.8)' }} />
+                    <div style={{ position: 'absolute', width: '1.5px', height: '16px', backgroundColor: '#06b6d4', boxShadow: '0 0 4px rgba(6, 182, 212, 0.8)' }} />
+                    {/* Center dot */}
+                    <div style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: '#06b6d4', boxShadow: '0 0 4px rgba(6, 182, 212, 0.8)' }} />
                 </div>
             )}
         </div>

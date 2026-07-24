@@ -99,8 +99,36 @@ function App(): JSX.Element {
         }
 
         autoAnswerConfidenceThresholdRef.current = res.settings.autoAnswerConfidenceThreshold ?? 0.8;
+        useUIStore.getState().setSafeCursorMode(res.settings.safeCursorMode !== false);
       }
     });
+  }, []);
+
+  // Listen for settings updates from the main process
+  useEffect(() => {
+    if (window.electronAPI?.onSettingsUpdated) {
+      return window.electronAPI.onSettingsUpdated((updatedSettings) => {
+        if (updatedSettings) {
+          const mode = updatedSettings.questionDetectionMode || "heuristic";
+          setAutoDetectionEnabled(mode !== "manual");
+
+          const engine = updatedSettings.sttEngine || "whisper";
+          if (engine === "deepgram") {
+            setSttEngine("Deepgram");
+            setSttModel(updatedSettings.deepgramModel || "nova-3");
+          } else if (engine === "moonshine") {
+            setSttEngine("Moonshine");
+            setSttModel(updatedSettings.moonshineModel || "MEDIUM_STREAMING");
+          } else {
+            setSttEngine("Whisper.cpp");
+            setSttModel(updatedSettings.whisperModel || "small.en");
+          }
+
+          autoAnswerConfidenceThresholdRef.current = updatedSettings.autoAnswerConfidenceThreshold ?? 0.8;
+          useUIStore.getState().setSafeCursorMode(updatedSettings.safeCursorMode !== false);
+        }
+      });
+    }
   }, []);
 
   // Listen for prepJob settings from Dashboard window on mount

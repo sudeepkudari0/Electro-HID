@@ -42,6 +42,7 @@ export interface AppSettings {
     applyModel: string;
     autoAnswerConfidenceThreshold: number; // 0-1, questions above this confidence auto-generate answers
     micDeviceId: string;
+    safeCursorMode: boolean;
 }
 
 const CURRENT_VERSION = 21;
@@ -86,6 +87,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     applyModel: 'gpt-4o-mini',
     autoAnswerConfidenceThreshold: 0.8,
     micDeviceId: 'default',
+    safeCursorMode: true,
 };
 
 // Migration map: version number -> transform function

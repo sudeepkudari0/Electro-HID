@@ -684,6 +684,13 @@ Be concise but thorough. Use bullet points and code blocks where appropriate.`;
             // Clear the old singleton to force re-reading new keys
             resetLLMService();
 
+            // Broadcast settings updates to all open windows
+            BrowserWindow.getAllWindows().forEach((win) => {
+                if (!win.isDestroyed()) {
+                    win.webContents.send('settings:updated', updated);
+                }
+            });
+
             return { success: true, settings: updated };
         } catch (error) {
             return { success: false, error: String(error) };
