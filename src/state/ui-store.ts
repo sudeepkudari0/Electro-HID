@@ -15,6 +15,7 @@ interface UIState {
     isDeveloperMode: boolean;
     safeCursorMode: boolean;
     isHidden: boolean;
+    autoScroll: boolean;
 
     // Actions
     toggleExpanded: () => void;
@@ -35,6 +36,7 @@ interface UIState {
     toggleDeveloperMode: () => void;
     setSafeCursorMode: (val: boolean) => void;
     toggleHidden: () => void;
+    toggleAutoScroll: () => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -52,6 +54,7 @@ export const useUIStore = create<UIState>((set) => ({
     isDeveloperMode: false,
     safeCursorMode: true,
     isHidden: false,
+    autoScroll: true,
 
     // Actions
     toggleExpanded: () =>
@@ -136,4 +139,5 @@ export const useUIStore = create<UIState>((set) => ({
 
     setSafeCursorMode: (val) => set({ safeCursorMode: val }),
     toggleHidden: () => set((state) => ({ isHidden: !state.isHidden })),
+    toggleAutoScroll: () => set((state) => ({ autoScroll: !state.autoScroll })),
 }));

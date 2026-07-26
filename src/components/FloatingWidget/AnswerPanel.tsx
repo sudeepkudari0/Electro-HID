@@ -221,8 +221,15 @@ export function AnswerPanel({ answers, currentIndex, onNavigate, onClear }: Answ
                                                     Copy
                                                 </button>
                                             </div>
-                                            <pre className="!bg-zinc-900 !m-0 p-3 overflow-x-auto w-full max-w-full">
-                                                <code className={`${className || ''} text-xs font-mono leading-relaxed`} {...props}>
+                                            <pre 
+                                                className="!bg-zinc-900 !m-0 p-3 overflow-x-auto w-full max-w-full"
+                                                style={{ whiteSpace: 'pre', wordBreak: 'normal', overflowWrap: 'normal' }}
+                                            >
+                                                <code 
+                                                    className={`${className || ''} text-xs font-mono leading-relaxed`}
+                                                    style={{ whiteSpace: 'pre', wordBreak: 'normal', overflowWrap: 'normal' }}
+                                                    {...props}
+                                                >
                                                     {children}
                                                 </code>
                                             </pre>

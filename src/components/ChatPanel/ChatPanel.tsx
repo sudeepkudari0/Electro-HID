@@ -399,8 +399,15 @@ export function ChatPanel({ onClose }: ChatPanelProps) {
                                                                 </button>
                                                             </div>
                                                         </div>
-                                                        <pre className="!bg-zinc-950 !m-0 p-3 overflow-x-auto scrollbar-thin w-full max-w-full">
-                                                            <code className={`${className || ''} text-xs font-mono leading-relaxed text-zinc-200`} {...props}>
+                                                        <pre 
+                                                            className="!bg-zinc-950 !m-0 p-3 overflow-x-auto scrollbar-thin w-full max-w-full"
+                                                            style={{ whiteSpace: 'pre', wordBreak: 'normal', overflowWrap: 'normal' }}
+                                                        >
+                                                            <code 
+                                                                className={`${className || ''} text-xs font-mono leading-relaxed text-zinc-200`} 
+                                                                style={{ whiteSpace: 'pre', wordBreak: 'normal', overflowWrap: 'normal' }}
+                                                                {...props}
+                                                            >
                                                                 {children}
                                                             </code>
                                                         </pre>

@@ -38,8 +38,15 @@ export interface TranscriptionEntry {
  *   echoes even when Whisper produces slightly different wording for the same
  *   audio from different channels.
  */
-const ECHO_WINDOW_MS = 8000;
-const SIMILARITY_THRESHOLD = 0.55;
+const ECHO_WINDOW_MS = 3000; // Reduced from 8000 to prevent false-positives on conversational turn-taking
+const SIMILARITY_THRESHOLD = 0.70; // Increased from 0.55 to be more precise
+const CONTAINMENT_THRESHOLD = 0.85; // Increased from 0.70 to require stronger overlap
+
+// Short utterances (e.g. conversational acknowledgments like "ok", "yeah")
+// need much stricter constraints because they are highly common in natural conversation.
+const SHORT_UTTERANCE_WORD_COUNT = 3;
+const SHORT_UTTERANCE_WINDOW_MS = 1500;
+const SHORT_UTTERANCE_SIMILARITY_THRESHOLD = 0.85;
 
 /**
  * Normalize text for comparison: lowercase, strip punctuation, collapse whitespace.
@@ -123,25 +130,43 @@ export class EchoSuppressor {
         const now = Date.now();
         this.pruneOldEntries();
 
+        const words = normalize(text).split(' ').filter(w => w.length > 0);
+        const isShort = words.length <= SHORT_UTTERANCE_WORD_COUNT;
+
         // Compare against all recent user transcriptions within the echo window
         for (const userEntry of this.recentUserTranscriptions) {
             const timeDelta = now - userEntry.timestamp;
-            if (timeDelta > ECHO_WINDOW_MS) continue;
+            
+            // Determine the maximum window based on whether the utterance is short
+            const maxWindow = isShort ? SHORT_UTTERANCE_WINDOW_MS : ECHO_WINDOW_MS;
+            if (timeDelta > maxWindow) continue;
 
             // Check similarity
             const similarity = wordSimilarity(text, userEntry.text);
-            const containment = containmentScore(userEntry.text, text);
 
-            // Either high overall similarity OR most of the interviewer text
-            // is contained in a recent user transcription
-            if (similarity >= SIMILARITY_THRESHOLD || containment >= 0.7) {
-                this.suppressionCount++;
-                console.log(
-                    `[EchoSuppressor] SUPPRESSED interviewer echo ` +
-                    `(similarity=${similarity.toFixed(2)}, containment=${containment.toFixed(2)}, ` +
-                    `delta=${timeDelta}ms): "${text.slice(0, 80)}..."`
-                );
-                return true;
+            if (isShort) {
+                // Short utterances must be highly similar and have a tight time window
+                if (similarity >= SHORT_UTTERANCE_SIMILARITY_THRESHOLD) {
+                    this.suppressionCount++;
+                    console.log(
+                        `[EchoSuppressor] SUPPRESSED interviewer echo (short utterance) ` +
+                        `(similarity=${similarity.toFixed(2)}, delta=${timeDelta}ms): "${text.slice(0, 80)}..."`
+                    );
+                    return true;
+                }
+            } else {
+                const containment = containmentScore(userEntry.text, text);
+                // Either high overall similarity OR most of the interviewer text
+                // is contained in a recent user transcription
+                if (similarity >= SIMILARITY_THRESHOLD || containment >= CONTAINMENT_THRESHOLD) {
+                    this.suppressionCount++;
+                    console.log(
+                        `[EchoSuppressor] SUPPRESSED interviewer echo ` +
+                        `(similarity=${similarity.toFixed(2)}, containment=${containment.toFixed(2)}, ` +
+                        `delta=${timeDelta}ms): "${text.slice(0, 80)}..."`
+                    );
+                    return true;
+                }
             }
         }
 

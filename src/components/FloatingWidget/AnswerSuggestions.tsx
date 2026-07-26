@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Trash2, Sparkles, Copy, Check, Zap, Loader2, ChevronDown, ChevronRight } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { parseProgressiveJson } from '../../lib/prompts/parse-json';
+import { useUIStore } from '../../state/ui-store';
 import type { CandidateQuestion, DetectedQuestion } from '../../state';
 
 interface AnswerSuggestionsProps {
@@ -20,10 +21,12 @@ function CandidateCard({
     candidate,
     onPick,
     onDismiss,
+    autoScroll,
 }: {
     candidate: CandidateQuestion;
     onPick: (id: string, text: string) => void;
     onDismiss: (id: string) => void;
+    autoScroll: boolean;
 }) {
     const isAnswering = candidate.status === 'answering';
     const isAnswered = candidate.status === 'answered';
@@ -32,6 +35,13 @@ function CandidateCard({
     const [isCollapsed, setIsCollapsed] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
     const structuredJson = parseProgressiveJson(candidate.answer || '');
+
+    // Auto-scroll to bottom of the card's answer area during streaming
+    useEffect(() => {
+        if (autoScroll && candidate.isStreaming && scrollRef.current) {
+            scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        }
+    }, [candidate.answer, candidate.isStreaming, autoScroll]);
 
     const handleCopy = async (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -186,8 +196,17 @@ function CandidateCard({
                                                 );
                                             }
                                             return (
-                                                <pre className="!bg-zinc-900 !m-0 p-3 rounded-lg overflow-x-auto my-2 border border-zinc-700/50">
-                                                    <code className={`${className || ''} text-xs font-mono`} {...props}>{children}</code>
+                                                <pre 
+                                                    className="!bg-zinc-900 !m-0 p-3 rounded-lg overflow-x-auto my-2 border border-zinc-700/50"
+                                                    style={{ whiteSpace: 'pre', wordBreak: 'normal', overflowWrap: 'normal' }}
+                                                >
+                                                    <code 
+                                                        className={`${className || ''} text-xs font-mono`}
+                                                        style={{ whiteSpace: 'pre', wordBreak: 'normal', overflowWrap: 'normal' }}
+                                                        {...props}
+                                                    >
+                                                        {children}
+                                                    </code>
                                                 </pre>
                                             );
                                         },
@@ -225,13 +244,14 @@ export function AnswerSuggestions({
     onClearAll,
 }: AnswerSuggestionsProps) {
     const scrollRef = useRef<HTMLDivElement>(null);
+    const { autoScroll, toggleAutoScroll } = useUIStore();
 
     // Auto-scroll to top when new questions arrive
     useEffect(() => {
-        if (scrollRef.current) {
+        if (autoScroll && scrollRef.current) {
             scrollRef.current.scrollTop = 0;
         }
-    }, [candidateQuestions.length]);
+    }, [candidateQuestions.length, autoScroll]);
 
     return (
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
@@ -241,14 +261,28 @@ export function AnswerSuggestions({
                     <Sparkles className="w-4 h-4 text-indigo-400" />
                     <span>Real-time Suggestions</span>
                 </span>
-                {candidateQuestions.length > 0 && (
-                    <button
-                        onClick={onClearAll}
-                        className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors flex items-center gap-1"
-                    >
-                        <Trash2 className="w-3.5 h-3.5" /> Clear All
-                    </button>
-                )}
+                <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] text-zinc-400 font-medium">
+                            Auto Scroll
+                        </span>
+                        <button
+                            onClick={toggleAutoScroll}
+                            className={`toggle-switch ${autoScroll ? 'toggle-switch--active' : ''}`}
+                            title="Toggle auto scroll"
+                        >
+                            <div className="toggle-switch__knob" />
+                        </button>
+                    </div>
+                    {candidateQuestions.length > 0 && (
+                        <button
+                            onClick={onClearAll}
+                            className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors flex items-center gap-1"
+                        >
+                            <Trash2 className="w-3.5 h-3.5" /> Clear All
+                        </button>
+                    )}
+                </div>
             </div>
 
             {/* List area */}
@@ -271,6 +305,7 @@ export function AnswerSuggestions({
                             candidate={q}
                             onPick={onPickQuestion}
                             onDismiss={onDismissCandidate}
+                            autoScroll={autoScroll}
                         />
                     ))
                 )}
