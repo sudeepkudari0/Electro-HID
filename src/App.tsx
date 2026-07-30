@@ -681,8 +681,8 @@ function App(): JSX.Element {
     // 3. Prepare the prompt context and pre-compute debug prompt
     const promptContext: PromptContext = {
       interviewType: interviewType as any,
-      currentQuestion: contextTranscript,
-      conversationHistory: "",
+      currentQuestion: _questionText,
+      conversationHistory: contextTranscript,
       resume: profile.resume,
       jobDescription: profile.jobDescription,
       company: profile.targetCompany,

@@ -36,12 +36,7 @@ function CandidateCard({
     const scrollRef = useRef<HTMLDivElement>(null);
     const structuredJson = parseProgressiveJson(candidate.answer || '');
 
-    // Auto-scroll to bottom of the card's answer area during streaming
-    useEffect(() => {
-        if (autoScroll && candidate.isStreaming && scrollRef.current) {
-            scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-        }
-    }, [candidate.answer, candidate.isStreaming, autoScroll]);
+    // Auto-scroll disabled — user controls scroll position
 
     const handleCopy = async (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -159,8 +154,24 @@ function CandidateCard({
                                 <div className="space-y-3 animate-fade-in font-sans">
                                     {/* Direct narrative spoken answer */}
                                     {structuredJson.answer && (
-                                        <div className="text-[13.5px] leading-relaxed text-zinc-100 select-text whitespace-pre-wrap">
-                                            {structuredJson.answer}
+                                        <div className="text-[13.5px] leading-relaxed text-zinc-100 select-text">
+                                            <ReactMarkdown
+                                                components={{
+                                                    p: ({ children }) => <p className="mb-1.5 last:mb-0">{children}</p>,
+                                                    strong: ({ children }) => <strong className="text-cyan-300 font-semibold">{children}</strong>,
+                                                    ul: ({ children }) => <ul className="space-y-1.5 list-none pl-0">{children}</ul>,
+                                                    li: ({ children }) => (
+                                                        <li className="flex items-start gap-2">
+                                                            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 mt-[7px] shrink-0 shadow-[0_0_6px_rgba(34,211,238,0.4)]" />
+                                                            <span>{children}</span>
+                                                        </li>
+                                                    ),
+                                                }}
+                                            >
+                                                {structuredJson.answer
+                                                    .replace(/\s*•\s*/g, '\n- ')
+                                                    .trim()}
+                                            </ReactMarkdown>
                                         </div>
                                     )}
 
