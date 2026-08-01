@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigationStore } from '../../state/navigation-store';
+import { SessionDetail } from '../../components/SessionHistory/SessionDetail';
 
 interface SessionSummary {
   id: string;
@@ -15,6 +16,20 @@ export function InterviewPrepLanding() {
 
   const [recentSessions, setRecentSessions] = useState<SessionSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedSession, setSelectedSession] = useState<any>(null);
+
+  const handleSessionClick = async (sessionId: string) => {
+    try {
+      if (window.electronAPI?.session?.load) {
+        const result = await window.electronAPI.session.load(sessionId);
+        if (result.success && result.session) {
+          setSelectedSession(result.session);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load session details:", error);
+    }
+  };
 
   useEffect(() => {
     async function loadSessions() {
@@ -51,6 +66,20 @@ export function InterviewPrepLanding() {
     }
     return date.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
   };
+
+  if (selectedSession) {
+    return (
+      <div className="p-10 max-w-6xl mx-auto animate-in fade-in duration-500 text-slate-200">
+        <div className="rounded-2xl border border-white/10 overflow-hidden shadow-2xl bg-zinc-900">
+          <SessionDetail
+            session={selectedSession}
+            onClose={() => setSelectedSession(null)}
+            onBack={() => setSelectedSession(null)}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-10 max-w-6xl mx-auto animate-in fade-in duration-700 min-h-screen text-slate-200">
@@ -115,6 +144,7 @@ export function InterviewPrepLanding() {
           ) : recentSessions.map((session) => (
             <div 
               key={session.id}
+              onClick={() => handleSessionClick(session.id)}
               className="bg-[#12141c] border border-white/5 rounded-2xl p-6 hover:border-white/10 hover:bg-[#151821] transition-colors cursor-pointer group"
             >
               <div className="flex justify-between items-start mb-4">

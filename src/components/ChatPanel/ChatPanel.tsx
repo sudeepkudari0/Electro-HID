@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { X, Send, Bot, User, Loader2, Camera, Crop } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { useLLM } from '../../hooks/useLLM';
+import { getSystemDesignPrompt } from '../../lib/prompts/templates/system-design';
 
 interface Message {
     id: string;
@@ -134,10 +135,23 @@ export function ChatPanel({ onClose }: ChatPanelProps) {
     const [isCapturing, setIsCapturing] = useState(false);
     const [isInjecting, setIsInjecting] = useState(false);
     const [isMirroring, setIsMirroring] = useState(false);
+    const [isSystemDesignMode, setIsSystemDesignMode] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
+    const sdPrompt = getSystemDesignPrompt({
+        interviewType: 'system-design',
+        currentQuestion: '',
+        conversationHistory: '',
+        resume: '',
+        jobDescription: '',
+        company: '',
+        useBulletPoints: false
+    }).system;
+
     const { isGenerating, generateResponse } = useLLM({
-        systemPrompt: "You are a helpful AI assistant integrated into an overlay tool. Be concise, direct, and helpful. Use markdown formatting where appropriate.",
+        systemPrompt: isSystemDesignMode 
+            ? sdPrompt
+            : "You are a helpful AI assistant integrated into an overlay tool. Be concise, direct, and helpful. Use markdown formatting where appropriate.",
     });
 
     const scrollToBottom = () => {
@@ -145,8 +159,9 @@ export function ChatPanel({ onClose }: ChatPanelProps) {
     };
 
     useEffect(() => {
+        // Only auto-scroll when a new message is added, not during streaming updates
         scrollToBottom();
-    }, [messages]);
+    }, [messages.length]);
 
     const handleAttachCapture = async () => {
         setIsCapturing(true);
@@ -270,6 +285,16 @@ export function ChatPanel({ onClose }: ChatPanelProps) {
                             Mirroring ON
                         </span>
                     )}
+                    <div className="ml-3 flex items-center gap-1.5 border-l border-zinc-700 pl-3">
+                        <span className="text-[10px] text-zinc-400 font-medium">SD Mode</span>
+                        <button
+                            onClick={() => setIsSystemDesignMode(!isSystemDesignMode)}
+                            className={`toggle-switch ${isSystemDesignMode ? 'toggle-switch--active' : ''} scale-75 transform origin-left`}
+                            title="System Design Mode"
+                        >
+                            <div className="toggle-switch__knob" />
+                        </button>
+                    </div>
                 </div>
                 <button
                     onClick={onClose}

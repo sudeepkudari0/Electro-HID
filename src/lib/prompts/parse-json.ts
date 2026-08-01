@@ -66,6 +66,15 @@ export function parseProgressiveJson(rawText?: string): StructuredTeleprompterAn
     const reflectionMatch = /"(?:reflection|lesson|edgeCase|Edge Case|Trade-off|trade_off|nuance|risk)"\s*:\s*"([\s\S]*?)"(?=\s*(?:,\s*"(?:answer|response)"|,\s*\}$|^\s*\}$|$))/i.exec(text);
 
     let answerVal = answerMatch ? answerMatch[1].replace(/\\"/g, '"').replace(/\n+/g, ' ').trim() : undefined;
+
+    // Progressive streaming fallback: extract answer even when the closing quote hasn't arrived yet
+    if (!answerVal) {
+        const unclosedAnswerMatch = /"(?:answer|response|narrative)"\s*:\s*"([\s\S]*)$/i.exec(text);
+        if (unclosedAnswerMatch) {
+            answerVal = unclosedAnswerMatch[1].replace(/\\"/g, '"').replace(/\\n/g, '\n').replace(/\n+/g, ' ').trim();
+        }
+    }
+
     const reflectionVal = reflectionMatch ? reflectionMatch[1].replace(/\\"/g, '"').replace(/\n+/g, ' ').trim() : undefined;
 
     if (!answerVal) {

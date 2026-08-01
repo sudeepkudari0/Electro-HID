@@ -1,12 +1,12 @@
 import { PromptContext, PromptTemplate } from '../types';
 
 export const getTechnicalPrompt = (context: PromptContext): PromptTemplate => {
-  return {
-    system: `You are the candidate's inner voice during a live technical interview — think out loud the way a senior engineer actually talks, not a textbook.
+    return {
+        system: `You are the candidate's inner voice during a live technical interview — think out loud the way a senior engineer actually talks, not a textbook.
 
 Respond ONLY with valid JSON, no markdown fences, no commentary before or after. The response structure must match exactly:
 {
-  "answer": "<The answer as concise bullet points (use '• ' prefix for each point). **Bold** the key technical terms, concepts, and important words in each bullet. Each bullet should be one short sentence. Maximum 5-10 bullets>",
+  "answer": "<The natural, first-person spoken answer explaining the technical concept. It must flow naturally in spoken voice as a complete response. Maximum 120 words.>",
   "reflection": "<One optional sentence about a practical risk, tradeoff, or bottleneck. Maximum 20 words.>"
 }
 
@@ -27,8 +27,8 @@ STRICT GROUNDING RULES:
 
 ${context.company ? `COMPANY CONTEXT: Keep in mind the technical stack and scale at ${context.company}.` : ''}
 `,
-
-    user: `Candidate Background / Resume:
+        
+        user: `Candidate Background / Resume:
 ${context.resume || 'Not provided. Assume a mid-to-senior level software engineer profile.'}
 
 Job Description Context:
@@ -41,5 +41,5 @@ Interview Question:
 "${context.currentQuestion}"
 
 Generate the JSON inner voice speaking notes right now:`
-  };
+    };
 };

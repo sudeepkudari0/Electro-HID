@@ -144,43 +144,50 @@ export function AnswerPanel({ answers, currentIndex, onNavigate, onClear }: Answ
                 <div className="text-sm leading-relaxed text-[var(--text-primary)] answer-content select-text prose prose-invert prose-sm max-w-none">
                     {structuredJson ? (
                         <div className="space-y-3.5 animate-fade-in">
-                            {structuredJson.hook && (
-                                <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-lg p-3">
-                                    <div className="flex items-center gap-1.5 text-xs font-semibold text-indigo-400 mb-1">
-                                        <span>🎯</span>
-                                        <span>Direct Hook</span>
-                                    </div>
-                                    <p className="text-sm font-medium text-indigo-100 leading-snug">
-                                        {structuredJson.hook}
-                                    </p>
+                            {/* Main answer rendered as markdown (bullet points converted) */}
+                            {structuredJson.answer && (
+                                <div className="select-text">
+                                    <ReactMarkdown
+                                        components={{
+                                            code({ className, children, ...props }) {
+                                                const match = /language-(\w+)/.exec(className || '');
+                                                const isInline = !match;
+                                                if (isInline) {
+                                                    return (
+                                                        <code className="bg-zinc-800 text-emerald-400 px-1.5 py-0.5 rounded text-xs font-mono" {...props}>
+                                                            {children}
+                                                        </code>
+                                                    );
+                                                }
+                                                return (
+                                                    <pre className="!bg-zinc-900 !m-0 p-3 rounded-lg overflow-x-auto my-2 border border-zinc-700/50"
+                                                        style={{ whiteSpace: 'pre', wordBreak: 'normal', overflowWrap: 'normal' }}>
+                                                        <code className={`${className || ''} text-xs font-mono`}
+                                                            style={{ whiteSpace: 'pre', wordBreak: 'normal', overflowWrap: 'normal' }}
+                                                            {...props}>
+                                                            {children}
+                                                        </code>
+                                                    </pre>
+                                                );
+                                            },
+                                        }}
+                                    >
+                                        {structuredJson.answer
+                                            .replace(/\s*•\s*/g, '\n- ')
+                                            .trim()}
+                                    </ReactMarkdown>
                                 </div>
                             )}
 
-                            {structuredJson.points && structuredJson.points.length > 0 && (
-                                <div className="space-y-2 px-1">
-                                    <div className="flex items-center gap-1.5 text-xs font-semibold text-zinc-400">
-                                        <span>💬</span>
-                                        <span>Key Talking Points</span>
-                                    </div>
-                                    <ul className="space-y-2">
-                                        {structuredJson.points.map((point, idx) => (
-                                            <li key={idx} className="flex items-start gap-2.5 text-sm text-zinc-200">
-                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-2 shrink-0 shadow-[0_0_8px_rgba(52,211,153,0.6)]" />
-                                                <span className="leading-relaxed">{point}</span>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            )}
-
-                            {structuredJson.edgeCase && (
-                                <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 mt-2">
+                            {/* Reflection Card */}
+                            {structuredJson.reflection && (
+                                <div className="bg-amber-500/5 border border-amber-500/15 rounded-lg p-3 mt-3 select-text">
                                     <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-400 mb-1">
                                         <span>⚠️</span>
-                                        <span>Edge Case / Nuance</span>
+                                        <span>Reflection</span>
                                     </div>
                                     <p className="text-xs font-medium text-amber-200/90 leading-snug">
-                                        {structuredJson.edgeCase}
+                                        {structuredJson.reflection}
                                     </p>
                                 </div>
                             )}
