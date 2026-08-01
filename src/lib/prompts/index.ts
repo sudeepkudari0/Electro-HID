@@ -34,9 +34,5 @@ export const getPromptTemplate = (context: PromptContext): PromptTemplate => {
             break;
     }
 
-    if (context.useBulletPoints) {
-        template.system += '\n\nCRITICAL: The candidate needs concise speaking notes. Format the entire answer using short bullet points instead of paragraphs. Keep it highly scannable.';
-    }
-
     return template;
 };

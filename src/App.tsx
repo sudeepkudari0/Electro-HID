@@ -61,7 +61,6 @@ function App(): JSX.Element {
     isPracticeOpen,
     isCapturing,
     isCodeMode,
-    useBulletPoints,
     isTeleprompterMode,
     toggleExpanded,
     setExpanded,
@@ -686,7 +685,6 @@ function App(): JSX.Element {
       resume: profile.resume,
       jobDescription: profile.jobDescription,
       company: profile.targetCompany,
-      useBulletPoints,
       selectedStory: retrievalResult.selectedStory,
       retrievalSource: retrievalResult.chosenSource,
       similarityScore: retrievalResult.similarityScore
@@ -849,7 +847,18 @@ function App(): JSX.Element {
             questionCount: detectedQuestions.length + candidateQuestions.length,
             conversation: conversationRef.current,
             transcript: conversationRef.current,
-            answers: answers,
+            answers: [
+              ...answers,
+              ...candidateQuestions
+                .filter((q) => q.answer && q.answer.trim().length > 0)
+                .map((q) => ({
+                  id: q.id,
+                  source: "transcript" as const,
+                  question: q.text,
+                  answer: q.answer || "",
+                  timestamp: q.timestamp || new Date(),
+                })),
+            ],
             detectedQuestions: detectedQuestions,
             metrics: metrics,
             deliveryMetrics: metrics,

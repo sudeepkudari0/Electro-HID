@@ -22,48 +22,38 @@ export const getHRScreeningPrompt = (context: HRContext): PromptTemplate => {
     const questionType = detectQuestionType(context.currentQuestion);
     const salaryPref = context.salaryPreferences;
 
-    let salaryInstructions = '';
+    let extraInstructions = '';
     if (questionType === 'salary' && salaryPref) {
         const strategy = salaryPref.negotiationStrategy || 'deflect';
         if (strategy === 'deflect') {
-            salaryInstructions = `The candidate prefers to DEFLECT salary questions. Suggest saying: "I'm focused on finding the right role and team fit. I'd love to learn more about the total compensation structure for this position."`;
+            extraInstructions = `\nSALARY STRATEGY: Deflect. Suggest: "I'm focused on finding the right role and team fit. I'd love to learn more about the total compensation structure."`;
         } else if (strategy === 'anchor-high') {
-            salaryInstructions = `The candidate wants to ANCHOR HIGH. Their target is ${salaryPref.targetSalary || 'competitive'}. Frame as: "Based on my experience and market research, I'm targeting [target range]. I'm open to discussing the full package."`;
+            extraInstructions = `\nSALARY STRATEGY: Anchor high. Target: ${salaryPref.targetSalary || 'competitive'}. Frame as: "Based on my experience, I'm targeting [range]. Open to discussing full package."`;
         } else if (strategy === 'market-rate') {
-            salaryInstructions = `The candidate wants to use MARKET RATE. Say: "I'm looking for a compensation package that's competitive with market rates for this role and level in this geography."`;
+            extraInstructions = `\nSALARY STRATEGY: Market rate. Say: "I'm looking for compensation competitive with market rates for this role and level."`;
         }
     }
-
-    let redFlagInstructions = '';
     if (questionType === 'red-flag') {
-        redFlagInstructions = `This is a potentially sensitive question about gaps, departures, or career transitions. Frame the response DIPLOMATICALLY:
-- Gaps: Frame as intentional (learning, caregiving, personal project)
-- Departures: Focus on what you're moving TOWARD, not away from
-- Short tenures: Emphasize what you learned and accomplished
+        extraInstructions = `\nSENSITIVE QUESTION — frame diplomatically:
+- Gaps → intentional (learning, caregiving, personal project)
+- Departures → focus on what you're moving TOWARD
+- Short tenures → emphasize what you learned
 - Never speak negatively about previous employers`;
     }
 
     return {
-        system: `You are an expert career coach helping a candidate navigate an HR screening call.
-HARD LIMIT: Response MUST be under 150 words. HR answers should be brief and confident.
-Maintain a professional, positive, and collaborative tone.
-${salaryInstructions}
-${redFlagInstructions}
-${questionType === 'general' ? 'If the question is about weaknesses or challenges, frame them positively as areas of intentional growth with specific actions taken.' : ''}`,
-        
-        user: `Candidate Background:
-${context.resume || 'Not provided.'}
+        system: `You are an interview coach helping a candidate navigate an HR screening call.
 
-Target Role: ${context.targetRole || 'Not specified'}
-Target Company: ${context.company || 'Not specified'}
+RULES:
+- Answer in first person, professional and confident tone
+- Use markdown bullet points (- ). Max 5 bullet points (HR answers should be brief)
+- Ground in the candidate's real background — do NOT invent
+- No buzzwords: delve, spearhead, robust, holistic, synergy, paradigm, leverage, passionate
+- Do NOT wrap in JSON or code fences. Output raw markdown only${extraInstructions}`,
 
-Conversation History:
-${context.conversationHistory}
+        user: `${context.resume ? `Candidate Background:\n${context.resume}\n\n` : ''}${context.targetRole ? `Target Role: ${context.targetRole}\n` : ''}${context.company ? `Target Company: ${context.company}\n\n` : ''}${context.conversationHistory ? `Conversation so far:\n${context.conversationHistory}\n\n` : ''}HR Question: "${context.currentQuestion}"
 
-HR Question:
-${context.currentQuestion}
-
-Provide the concise HR screening answer (under 150 words):`
+Provide the bullet-point speaking cues now:`
     };
 };
 

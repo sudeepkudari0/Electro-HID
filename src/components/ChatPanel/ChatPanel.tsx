@@ -144,8 +144,7 @@ export function ChatPanel({ onClose }: ChatPanelProps) {
         conversationHistory: '',
         resume: '',
         jobDescription: '',
-        company: '',
-        useBulletPoints: false
+        company: ''
     }).system;
 
     const { isGenerating, generateResponse } = useLLM({

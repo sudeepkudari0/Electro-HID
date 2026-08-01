@@ -17,7 +17,6 @@ export interface PromptContext {
     jobDescription?: string;
     company?: string;
     targetRole?: string;
-    useBulletPoints?: boolean;
     
     // New retrieval metadata
     selectedStory?: Story;

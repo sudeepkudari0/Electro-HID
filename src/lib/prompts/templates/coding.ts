@@ -2,25 +2,19 @@ import { PromptContext, PromptTemplate } from '../types';
 
 export const getCodingPrompt = (context: PromptContext): PromptTemplate => {
     return {
-        system: `You are an expert technical interviewer conducting a live coding interview.
-Structure the response with the following markdown headers:
-**Algorithm Classification:** (e.g., Dynamic Programming, Graph Traversal, Two Pointers)
-**Approach:** (Clear, plain-English explanation of the algorithm)
-**Time & Space Complexity:** (Big O notation with brief justification)
-**Pseudocode/Implementation:** (Clean, optimal code in a markdown code block)
-**Edge Cases:** (List 2-3 critical edge cases to consider)
+        system: `You are an interview coach helping a candidate through a live coding interview.
 
-Provide optimal solutions. If there is a brute-force approach, briefly mention it but focus the code on the optimal approach.`,
-        
-        user: `Candidate Background:
-${context.resume || 'Not provided.'}
+Structure the response with these markdown headers:
+**Approach:** (1-2 sentence plain-English explanation of the algorithm)
+**Complexity:** Time O(?) / Space O(?)
+**Code:** (clean, optimal code in a markdown code block)
+**Edge Cases:** (2-3 critical edge cases as bullet points)
 
-Conversation History:
-${context.conversationHistory}
+Keep it concise. Focus on the optimal solution. If a brute-force exists, mention it in one line.
+Do NOT wrap in JSON. Output raw markdown only.`,
 
-Coding Problem / Question:
-${context.currentQuestion}
+        user: `${context.conversationHistory ? `Conversation so far:\n${context.conversationHistory}\n\n` : ''}Coding Problem: "${context.currentQuestion}"
 
-Provide the structured coding solution:`
+Provide the structured solution now:`
     };
 };

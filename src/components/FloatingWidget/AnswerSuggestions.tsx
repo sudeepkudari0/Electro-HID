@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Trash2, Sparkles, Copy, Check, Zap, Loader2, ChevronDown, ChevronRight } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
-import { parseProgressiveJson } from '../../lib/prompts/parse-json';
 import { useUIStore } from '../../state/ui-store';
 import type { CandidateQuestion, DetectedQuestion } from '../../state';
 
@@ -34,16 +33,13 @@ function CandidateCard({
     const [copied, setCopied] = useState(false);
     const [isCollapsed, setIsCollapsed] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
-    const structuredJson = parseProgressiveJson(candidate.answer || '');
 
     // Auto-scroll disabled — user controls scroll position
 
     const handleCopy = async (e: React.MouseEvent) => {
         e.stopPropagation();
         if (candidate.answer) {
-            // Copy pure narrative text if JSON parsing is successful, otherwise copy raw
-            const textToCopy = structuredJson?.answer || candidate.answer;
-            await navigator.clipboard.writeText(textToCopy);
+            await navigator.clipboard.writeText(candidate.answer);
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
         }
@@ -79,11 +75,10 @@ function CandidateCard({
                             ) : (
                                 <Zap className="w-3 h-3 text-cyan-500/60" />
                             )}
-                            <span className={`text-[10px] font-semibold uppercase tracking-wider ${
-                                isAnswering ? 'text-amber-400'
-                                : isAnswered ? 'text-emerald-400'
-                                : 'text-cyan-500/60'
-                            }`}>
+                            <span className={`text-[10px] font-semibold uppercase tracking-wider ${isAnswering ? 'text-amber-400'
+                                    : isAnswered ? 'text-emerald-400'
+                                        : 'text-cyan-500/60'
+                                }`}>
                                 {isAnswering ? 'Generating answer...' : isAnswered ? 'Answered' : 'Detected Question'}
                             </span>
                             {/* Confidence badge */}
@@ -150,50 +145,7 @@ function CandidateCard({
                         className="px-3.5 py-3 max-h-[400px] overflow-y-auto select-text"
                     >
                         <div className="text-[13px] leading-relaxed text-[var(--text-primary)] answer-content select-text prose prose-invert prose-sm max-w-none">
-                            {structuredJson ? (
-                                <div className="space-y-3 animate-fade-in font-sans">
-                                    {/* Direct narrative spoken answer */}
-                                    {structuredJson.answer && (
-                                        <div className="text-[13.5px] leading-relaxed text-zinc-100 select-text">
-                                            <ReactMarkdown
-                                                components={{
-                                                    p: ({ children }) => <p className="mb-1.5 last:mb-0">{children}</p>,
-                                                    strong: ({ children }) => <strong className="text-cyan-300 font-semibold">{children}</strong>,
-                                                    ul: ({ children }) => <ul className="space-y-1.5 list-none pl-0">{children}</ul>,
-                                                    li: ({ children }) => (
-                                                        <li className="flex items-start gap-2">
-                                                            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 mt-[7px] shrink-0 shadow-[0_0_6px_rgba(34,211,238,0.4)]" />
-                                                            <span>{children}</span>
-                                                        </li>
-                                                    ),
-                                                }}
-                                            >
-                                                {structuredJson.answer
-                                                    .replace(/\s*•\s*/g, '\n- ')
-                                                    .trim()}
-                                            </ReactMarkdown>
-                                        </div>
-                                    )}
-
-                                    {/* Reflection Card */}
-                                    {structuredJson.reflection && (
-                                        <div className="bg-amber-500/5 border border-amber-500/15 rounded-lg p-3 mt-3 select-text">
-                                            <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-400 mb-1">
-                                                <span>⚠️</span>
-                                                <span>Reflection</span>
-                                            </div>
-                                            <p className="text-xs font-medium text-amber-250 leading-snug">
-                                                {structuredJson.reflection}
-                                            </p>
-                                        </div>
-                                    )}
-                                </div>
-                            ) : (candidate.answer?.trim().startsWith('{') || candidate.answer?.trim().startsWith('```')) && candidate.isStreaming ? (
-                                <div className="flex items-center gap-2 text-xs text-indigo-400 py-2 animate-pulse font-medium">
-                                    <span>⏳</span>
-                                    <span>Formatting notes...</span>
-                                </div>
-                            ) : (
+                            {candidate.answer ? (
                                 <ReactMarkdown
                                     components={{
                                         code({ className, children, ...props }) {
@@ -207,11 +159,11 @@ function CandidateCard({
                                                 );
                                             }
                                             return (
-                                                <pre 
+                                                <pre
                                                     className="!bg-zinc-900 !m-0 p-3 rounded-lg overflow-x-auto my-2 border border-zinc-700/50"
                                                     style={{ whiteSpace: 'pre', wordBreak: 'normal', overflowWrap: 'normal' }}
                                                 >
-                                                    <code 
+                                                    <code
                                                         className={`${className || ''} text-xs font-mono`}
                                                         style={{ whiteSpace: 'pre', wordBreak: 'normal', overflowWrap: 'normal' }}
                                                         {...props}
@@ -225,7 +177,7 @@ function CandidateCard({
                                 >
                                     {candidate.answer}
                                 </ReactMarkdown>
-                            )}
+                            ) : null}
 
                             {candidate.isStreaming && <span className="streaming-cursor" />}
                         </div>

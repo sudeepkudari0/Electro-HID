@@ -1,9 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Trash2, MessageSquare, ChevronDown, ChevronRight as ChevronRightIcon, List, AlignLeft } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Trash2, MessageSquare, ChevronDown, ChevronRight as ChevronRightIcon } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { IconButton } from '../shared/IconButton';
 import { CopyButton } from '../shared/CopyButton';
-import { useUIStore } from '../../state/ui-store';
 import type { Answer } from '../../state';
 
 interface AnswerPanelProps {
@@ -39,11 +38,10 @@ function cleanBannedWords(text: string): string {
     return result;
 }
 
-import { parseProgressiveJson } from '../../lib/prompts/parse-json';
+
 
 
 export function AnswerPanel({ answers, currentIndex, onNavigate, onClear }: AnswerPanelProps) {
-    const { useBulletPoints, toggleBulletPoints } = useUIStore();
     const [showFollowUps, setShowFollowUps] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
     const current = answers[currentIndex];
@@ -56,7 +54,6 @@ export function AnswerPanel({ answers, currentIndex, onNavigate, onClear }: Answ
     if (!current) return null;
 
     const cleanedAnswerText = cleanBannedWords(current.answer || '');
-    const structuredJson = parseProgressiveJson(cleanedAnswerText);
 
     return (
         <div className="panel-section animate-slide-up">
@@ -142,73 +139,15 @@ export function AnswerPanel({ answers, currentIndex, onNavigate, onClear }: Answ
 
                 {/* Answer text */}
                 <div className="text-sm leading-relaxed text-[var(--text-primary)] answer-content select-text prose prose-invert prose-sm max-w-none">
-                    {structuredJson ? (
-                        <div className="space-y-3.5 animate-fade-in">
-                            {/* Main answer rendered as markdown (bullet points converted) */}
-                            {structuredJson.answer && (
-                                <div className="select-text">
-                                    <ReactMarkdown
-                                        components={{
-                                            code({ className, children, ...props }) {
-                                                const match = /language-(\w+)/.exec(className || '');
-                                                const isInline = !match;
-                                                if (isInline) {
-                                                    return (
-                                                        <code className="bg-zinc-800 text-emerald-400 px-1.5 py-0.5 rounded text-xs font-mono" {...props}>
-                                                            {children}
-                                                        </code>
-                                                    );
-                                                }
-                                                return (
-                                                    <pre className="!bg-zinc-900 !m-0 p-3 rounded-lg overflow-x-auto my-2 border border-zinc-700/50"
-                                                        style={{ whiteSpace: 'pre', wordBreak: 'normal', overflowWrap: 'normal' }}>
-                                                        <code className={`${className || ''} text-xs font-mono`}
-                                                            style={{ whiteSpace: 'pre', wordBreak: 'normal', overflowWrap: 'normal' }}
-                                                            {...props}>
-                                                            {children}
-                                                        </code>
-                                                    </pre>
-                                                );
-                                            },
-                                        }}
-                                    >
-                                        {structuredJson.answer
-                                            .replace(/\s*•\s*/g, '\n- ')
-                                            .trim()}
-                                    </ReactMarkdown>
-                                </div>
-                            )}
-
-                            {/* Reflection Card */}
-                            {structuredJson.reflection && (
-                                <div className="bg-amber-500/5 border border-amber-500/15 rounded-lg p-3 mt-3 select-text">
-                                    <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-400 mb-1">
-                                        <span>⚠️</span>
-                                        <span>Reflection</span>
-                                    </div>
-                                    <p className="text-xs font-medium text-amber-200/90 leading-snug">
-                                        {structuredJson.reflection}
-                                    </p>
-                                </div>
-                            )}
-                        </div>
-                    ) : (cleanedAnswerText.trim().startsWith('{') || cleanedAnswerText.trim().startsWith('```')) && current.isStreaming ? (
-                        <div className="flex items-center gap-2 text-xs text-indigo-400 py-2 animate-pulse font-medium">
-                            <span>⏳</span>
-                            <span>Formatting teleprompter notes...</span>
-                        </div>
-                    ) : current.answer ? (
+                    {cleanedAnswerText ? (
                         <ReactMarkdown
                             components={{
-                                code({ node, className, children, ...props }) {
+                                code({ className, children, ...props }) {
                                     const match = /language-(\w+)/.exec(className || '');
                                     const isInline = !match;
                                     if (isInline) {
                                         return (
-                                            <code
-                                                className="bg-zinc-800 text-emerald-400 px-1.5 py-0.5 rounded text-xs font-mono"
-                                                {...props}
-                                            >
+                                            <code className="bg-zinc-800 text-emerald-400 px-1.5 py-0.5 rounded text-xs font-mono" {...props}>
                                                 {children}
                                             </code>
                                         );
@@ -289,18 +228,6 @@ export function AnswerPanel({ answers, currentIndex, onNavigate, onClear }: Answ
                         {current.timestamp.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                     </span>
                     <div className="flex items-center gap-2">
-                        <button
-                            onClick={toggleBulletPoints}
-                            className={`flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-medium transition-colors ${
-                                useBulletPoints 
-                                    ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30' 
-                                    : 'bg-zinc-800 text-zinc-400 hover:text-white border border-transparent'
-                            }`}
-                            title="Toggle Bullet Points for future answers"
-                        >
-                            {useBulletPoints ? <List className="w-3 h-3" /> : <AlignLeft className="w-3 h-3" />}
-                            Bullets
-                        </button>
                         <CopyButton text={current.answer} />
                     </div>
                 </div>
