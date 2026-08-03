@@ -15,6 +15,7 @@ export interface JobspyOptions {
   distance?: number; // miles
   country?: string; // e.g. usa, india, uk
   linkedinFetchDescription?: boolean;
+  excludeUrls?: string[];
 }
 
 /**
@@ -178,6 +179,10 @@ export function runJobspySearch(options: JobspyOptions, onStatusUpdate?: (status
     if (options.distance) command += ` --distance ${options.distance}`;
     if (options.country) command += ` --country "${options.country}"`;
     if (options.linkedinFetchDescription) command += ` --linkedin-fetch-description`;
+    if (options.excludeUrls && options.excludeUrls.length > 0) {
+      // join with comma and pass
+      command += ` --exclude-urls "${options.excludeUrls.join(',')}"`;
+    }
 
     console.log("[JobSpy Runner] Executing:", command);
 

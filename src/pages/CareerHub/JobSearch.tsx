@@ -296,6 +296,10 @@ export function JobSearch() {
       // Calculate results parameter for the python-jobspy scraper
       // We add the count of blocked companies so that we can filter them out and still have enough
       const resultsToRequest = maxResults + blockedCompanies.length;
+      // Pass excluded URLs from savedJobs
+      const excludeUrls = savedJobs
+        .map(j => j.url)
+        .filter(url => url && url.trim() !== '');
 
       const response = await (window as any).electronAPI.careerHub.runJobspy({
         query,
@@ -309,6 +313,7 @@ export function JobSearch() {
         distance,
         country,
         linkedinFetchDescription: linkedinFetchDesc || undefined,
+        excludeUrls: excludeUrls.length > 0 ? excludeUrls : undefined,
       });
 
       if (response.success) {
