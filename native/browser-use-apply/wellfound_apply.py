@@ -30,8 +30,10 @@ import re
 import argparse
 try:
     from patchright.async_api import async_playwright
+    USING_PATCHRIGHT = True
 except ImportError:
     from playwright.async_api import async_playwright
+    USING_PATCHRIGHT = False
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -671,6 +673,11 @@ async def main():
     max_jobs    = int(filters.get("maxJobs", 20))
 
     log(f"[Wellfound Apply] DryRun={dry_run}, MaxJobs={max_jobs}")
+
+    if USING_PATCHRIGHT:
+        log("[System] Using Patchright for browser automation")
+    else:
+        log("[System] Using Playwright for browser automation (Patchright not found)")
 
     if not profile_dir or not os.path.exists(profile_dir):
         log("[Error] Wellfound browser profile not found. Please log in to Wellfound first.")

@@ -63,10 +63,16 @@ async def main():
     if args.site == "wellfound":
         try:
             from patchright.async_api import async_playwright
+            print(json.dumps({"type": "log", "message": "[System] Using Patchright for browser automation"}))
+            sys.stdout.flush()
         except ImportError:
             from playwright.async_api import async_playwright
+            print(json.dumps({"type": "log", "message": "[System] Using Playwright for browser automation (Patchright not found)"}))
+            sys.stdout.flush()
     else:
         from playwright.async_api import async_playwright
+        print(json.dumps({"type": "log", "message": "[System] Using Playwright for browser automation"}))
+        sys.stdout.flush()
 
     async with async_playwright() as p:
         chrome_args = [
