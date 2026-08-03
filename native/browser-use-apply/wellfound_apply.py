@@ -687,6 +687,7 @@ async def main():
         context = await p.chromium.launch_persistent_context(
             user_data_dir=profile_dir,
             headless=False,
+            channel="chrome",
             args=[
                 "--no-first-run", "--no-default-browser-check",
                 "--disable-session-crashed-bubble",

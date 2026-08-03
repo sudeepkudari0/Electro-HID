@@ -89,6 +89,7 @@ async def main():
 
         context = await p.chromium.launch_persistent_context(
             user_data_dir=args.user_data_dir,
+            channel="chrome",
             headless=args.check,
             args=chrome_args,
             no_viewport=True,
