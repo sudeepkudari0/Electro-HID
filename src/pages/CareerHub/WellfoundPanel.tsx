@@ -36,10 +36,6 @@ interface StatusLog {
 }
 
 interface WellfoundFilters {
-  role: string;
-  location: string;
-  jobType: string;
-  remote: boolean;
   maxJobs: number;
 }
 
@@ -104,12 +100,7 @@ export function WellfoundPanel() {
   const [dryRun, setDryRun] = useState(true);
   const [stats, setStats] = useState({ processed: 0, applied: 0 });
 
-  // Filter config
   const [filters, setFilters] = useState<WellfoundFilters>({
-    role: "",
-    location: "",
-    jobType: "Full Time",
-    remote: false,
     maxJobs: 10,
   });
 
@@ -224,10 +215,13 @@ export function WellfoundPanel() {
       appendLog("[ERROR] Please log in to Wellfound first.", "error");
       return;
     }
-    if (!filters.role && !filters.location) {
-      appendLog("[ERROR] Please set at least a role or location filter.", "error");
-      return;
-    }
+
+    // Close any open manual login browser session to release the profile lock
+    appendLog("[SYSTEM] Stopping any open manual browser sessions...", "info");
+    try {
+      await (window as any).electronAPI.careerHub.stopLogin?.();
+      await new Promise(r => setTimeout(r, 1500)); // wait for lock to release
+    } catch (e) {}
 
     setLogs([]);
     setStats({ processed: 0, applied: 0 });
@@ -236,7 +230,6 @@ export function WellfoundPanel() {
     setActiveTab("logs");
 
     appendLog(`[SYSTEM] Starting Wellfound apply — DryRun: ${dryRun}, MaxJobs: ${filters.maxJobs}`, "info");
-    appendLog(`[SYSTEM] Filters: role="${filters.role}" location="${filters.location}" type="${filters.jobType}"`, "info");
 
     try {
       const profileRes = await (window as any).electronAPI.careerHub.loadProfile();
@@ -255,10 +248,6 @@ export function WellfoundPanel() {
       const res = await (window as any).electronAPI.careerHub.runWellfoundApply({
         profile: candidateProfile,
         filters: {
-          role: filters.role,
-          location: filters.location,
-          jobType: filters.jobType,
-          remote: filters.remote,
           maxJobs: filters.maxJobs,
         },
         dryRun,
@@ -407,7 +396,7 @@ export function WellfoundPanel() {
             }}
           >
             <Globe size={12} />
-            {loginStatus.loggedIn ? "Re-login" : "Login to Wellfound"}
+            {loginStatus.loggedIn ? "Open Wellfound" : "Login to Wellfound"}
           </button>
         </div>
       </div>
@@ -492,83 +481,25 @@ export function WellfoundPanel() {
             </label>
           </div>
 
-          {/* Filters */}
+          {/* Run Settings */}
           <div style={{
             background: "#12121e", border: "1px solid rgba(255,255,255,0.06)",
             borderRadius: "12px", padding: "18px",
           }}>
             <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px" }}>
               <Settings2 size={15} style={{ color: "#818cf8" }} />
-              <span style={{ fontSize: "13px", fontWeight: 700, color: "#e2e8f0" }}>Job Filters</span>
+              <span style={{ fontSize: "13px", fontWeight: 700, color: "#e2e8f0" }}>Run Settings</span>
               <span style={{ fontSize: "11px", color: "#475569", marginLeft: "4px" }}>
-                — these will be applied on wellfound.com/jobs
+                — configure how the bot applies
               </span>
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-
-              {/* Role */}
-              <div>
-                <label style={{ fontSize: "11px", color: "#64748b", fontWeight: 600, display: "block", marginBottom: "6px" }}>
-                  <Briefcase size={10} style={{ display: "inline", marginRight: "4px" }} />
-                  ROLE / TITLE
-                </label>
-                <input
-                  type="text"
-                  value={filters.role}
-                  onChange={(e) => setFilters((f) => ({ ...f, role: e.target.value }))}
-                  placeholder="e.g. Full-Stack Engineer"
-                  style={{
-                    width: "100%", padding: "9px 12px", borderRadius: "8px",
-                    background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
-                    color: "#e2e8f0", fontSize: "13px", outline: "none", boxSizing: "border-box",
-                  }}
-                />
-              </div>
-
-              {/* Location */}
-              <div>
-                <label style={{ fontSize: "11px", color: "#64748b", fontWeight: 600, display: "block", marginBottom: "6px" }}>
-                  <MapPin size={10} style={{ display: "inline", marginRight: "4px" }} />
-                  LOCATION
-                </label>
-                <input
-                  type="text"
-                  value={filters.location}
-                  onChange={(e) => setFilters((f) => ({ ...f, location: e.target.value }))}
-                  placeholder="e.g. Bengaluru, Remote"
-                  style={{
-                    width: "100%", padding: "9px 12px", borderRadius: "8px",
-                    background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
-                    color: "#e2e8f0", fontSize: "13px", outline: "none", boxSizing: "border-box",
-                  }}
-                />
-              </div>
-
-              {/* Job Type */}
-              <div>
-                <label style={{ fontSize: "11px", color: "#64748b", fontWeight: 600, display: "block", marginBottom: "6px" }}>
-                  <Clock size={10} style={{ display: "inline", marginRight: "4px" }} />
-                  JOB TYPE
-                </label>
-                <select
-                  value={filters.jobType}
-                  onChange={(e) => setFilters((f) => ({ ...f, jobType: e.target.value }))}
-                  style={{
-                    width: "100%", padding: "9px 12px", borderRadius: "8px",
-                    background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
-                    color: "#e2e8f0", fontSize: "13px", outline: "none", cursor: "pointer",
-                  }}
-                >
-                  {JOB_TYPES.map((t) => <option key={t} value={t} style={{ background: "#1e1e2e" }}>{t}</option>)}
-                </select>
-              </div>
-
               {/* Max Jobs */}
               <div>
                 <label style={{ fontSize: "11px", color: "#64748b", fontWeight: 600, display: "block", marginBottom: "6px" }}>
                   <Zap size={10} style={{ display: "inline", marginRight: "4px" }} />
-                  MAX JOBS
+                  MAX JOBS TO PROCESS
                 </label>
                 <input
                   type="number"
@@ -583,26 +514,6 @@ export function WellfoundPanel() {
                   }}
                 />
               </div>
-            </div>
-
-            {/* Remote toggle */}
-            <div style={{ marginTop: "12px", display: "flex", alignItems: "center", gap: "10px" }}>
-              <div
-                onClick={() => setFilters((f) => ({ ...f, remote: !f.remote }))}
-                style={{
-                  width: "36px", height: "20px", borderRadius: "10px", cursor: "pointer",
-                  background: filters.remote ? "#6366f1" : "rgba(255,255,255,0.1)",
-                  position: "relative", transition: "background 0.2s", flexShrink: 0,
-                }}
-              >
-                <div style={{
-                  width: "16px", height: "16px", borderRadius: "50%", background: "#fff",
-                  position: "absolute", top: "2px",
-                  left: filters.remote ? "18px" : "2px",
-                  transition: "left 0.2s",
-                }} />
-              </div>
-              <span style={{ fontSize: "12px", color: "#94a3b8" }}>Remote jobs only</span>
             </div>
           </div>
 
@@ -681,12 +592,12 @@ export function WellfoundPanel() {
           )}
 
           {/* Start / Stop button */}
-          <div style={{ display: "flex", gap: "10px" }}>
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "10px" }}>
             {isRunning ? (
               <button
                 onClick={handleStop}
                 style={{
-                  flex: 1, padding: "11px", borderRadius: "10px",
+                  width: "200px", padding: "11px", borderRadius: "10px",
                   background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)",
                   color: "#f87171", fontSize: "13px", fontWeight: 700, cursor: "pointer",
                   display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
@@ -700,7 +611,7 @@ export function WellfoundPanel() {
                 onClick={handleStart}
                 disabled={!loginStatus.loggedIn}
                 style={{
-                  flex: 1, padding: "11px", borderRadius: "10px",
+                  width: "200px", padding: "11px", borderRadius: "10px",
                   background: loginStatus.loggedIn
                     ? "linear-gradient(135deg, #f59e0b, #6366f1)"
                     : "rgba(255,255,255,0.04)",
@@ -712,7 +623,7 @@ export function WellfoundPanel() {
                 }}
               >
                 <Play size={15} />
-                {dryRun ? "Start Dry Run" : "Start Applying"}
+                {dryRun ? "Start Dry Run" : "Start"}
               </button>
             )}
           </div>

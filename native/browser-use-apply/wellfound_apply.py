@@ -697,7 +697,8 @@ async def main():
             await context.close()
             sys.exit(1)
 
-        await apply_filters(page, filters)
+        log("[Wellfound Apply] Waiting for user's manual filters to load...")
+        await page.wait_for_timeout(3000)
 
         total_processed = 0
         total_applied   = 0
