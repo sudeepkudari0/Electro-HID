@@ -261,6 +261,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         runLogin: async (site: 'linkedin' | 'default' | 'wellfound') => ipcRenderer.invoke('career:run-login', site),
         stopLogin: async () => ipcRenderer.invoke('career:stop-login'),
         checkLogin: async (site: 'linkedin' | 'default' | 'wellfound') => ipcRenderer.invoke('career:check-login', site),
+        clearSession: async (site: 'linkedin' | 'default' | 'wellfound') => ipcRenderer.invoke('career:clear-session', site),
         onApplyStatus: (callback: (eventData: any) => void) => {
             const handler = (_event: any, data: any) => callback(data);
             ipcRenderer.on('career:apply-status', handler);

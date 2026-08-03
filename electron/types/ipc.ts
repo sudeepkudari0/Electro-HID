@@ -90,6 +90,7 @@ export const IPC_CHANNELS = {
     CAREER_RUN_LOGIN: 'career:run-login',
     CAREER_STOP_LOGIN: 'career:stop-login',
     CAREER_CHECK_LOGIN: 'career:check-login',
+    CAREER_CLEAR_SESSION: 'career:clear-session',
     CAREER_APPROVE_APPLY: 'career:approve-apply',
     CAREER_AUTOFILL_PAGE: 'career:autofill-page',
     CAREER_RUN_AUTOFILL_SESSION: 'career:run-autofill-session',

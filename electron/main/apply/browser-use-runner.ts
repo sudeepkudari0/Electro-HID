@@ -641,6 +641,27 @@ export function runAutofillSession(
   });
 }
 
+export function clearSession(site: "linkedin" | "default" | "wellfound"): Promise<{ success: boolean; error?: string }> {
+  return new Promise((resolve) => {
+    try {
+      const userProfileBaseDir = path.join(app.getPath("userData"), "careerHub", "browser-profiles");
+      const profileDirName = site === "linkedin" ? "linkedin"
+        : site === "wellfound" ? "wellfound"
+        : "apply-default";
+      const profileDir = path.join(userProfileBaseDir, profileDirName);
+
+      if (fs.existsSync(profileDir)) {
+        fs.rmSync(profileDir, { recursive: true, force: true });
+        console.log(`[Apply Runner] Cleared session for ${site}: ${profileDir}`);
+      }
+      resolve({ success: true });
+    } catch (err: any) {
+      console.error(`[Apply Runner] Failed to clear session for ${site}:`, err);
+      resolve({ success: false, error: err.message });
+    }
+  });
+}
+
 export function checkLoginStatus(
   site: "linkedin" | "default" | "wellfound"
 ): Promise<any> {

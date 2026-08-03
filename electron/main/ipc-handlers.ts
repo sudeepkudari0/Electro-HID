@@ -963,6 +963,16 @@ Be concise but thorough. Use bullet points and code blocks where appropriate.`;
         }
     });
 
+    ipcMain.handle(IPC_CHANNELS.CAREER_CLEAR_SESSION, async (event, site: 'linkedin' | 'default' | 'wellfound') => {
+        try {
+            const { clearSession } = await import('./apply/browser-use-runner');
+            return await clearSession(site);
+        } catch (error) {
+            console.error('IPC: Auto-Apply clear session failed:', error);
+            return { success: false, error: String(error) };
+        }
+    });
+
     // ── Career Hub: Wellfound Auto Apply ─────────────────────────────────
     ipcMain.handle(IPC_CHANNELS.CAREER_RUN_WELLFOUND_APPLY, async (event, options: any) => {
         try {

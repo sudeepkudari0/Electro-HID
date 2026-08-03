@@ -210,6 +210,19 @@ export function WellfoundPanel() {
     }
   };
 
+  const handleClearSession = async () => {
+    if (window.confirm("Are you sure you want to clear the Wellfound session? This will log you out and delete your saved cookies.")) {
+      appendLog("[SYSTEM] Clearing Wellfound session...", "info");
+      try {
+        await (window as any).electronAPI.careerHub.clearSession?.("wellfound");
+        appendLog("[SYSTEM] Session cleared successfully.", "success");
+        setLoginStatus({ checked: true, loggedIn: false, checking: false });
+      } catch (e: any) {
+        appendLog(`[ERROR] Failed to clear session: ${e.message}`, "error");
+      }
+    }
+  };
+
   const handleStart = async () => {
     if (!loginStatus.loggedIn) {
       appendLog("[ERROR] Please log in to Wellfound first.", "error");
@@ -373,6 +386,19 @@ export function WellfoundPanel() {
           </div>
         </div>
         <div style={{ display: "flex", gap: "8px" }}>
+          <button
+            onClick={handleClearSession}
+            disabled={!loginStatus.loggedIn || isRunning}
+            style={{
+              background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)",
+              color: "#f87171", padding: "6px 12px", borderRadius: "7px",
+              fontSize: "12px", cursor: (!loginStatus.loggedIn || isRunning) ? "not-allowed" : "pointer",
+              opacity: (!loginStatus.loggedIn || isRunning) ? 0.5 : 1,
+            }}
+            title="Clear saved cookies and session"
+          >
+            Clear Session
+          </button>
           <button
             onClick={checkWellfoundLogin}
             disabled={loginStatus.checking || isRunning}
