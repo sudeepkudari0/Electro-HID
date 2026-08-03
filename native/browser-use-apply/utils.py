@@ -219,8 +219,7 @@ async def fill_text_field(page, el, val, label="Field"):
     try:
         await highlight_element(el)
         await el.focus()
-        await el.evaluate("(el) => el.value = ''")
-        await el.type(str(val), delay=15)
+        await el.fill(str(val))
         await page.evaluate("([msg]) => window.addAutofillLog(msg)", [f"Typed {label}: {val}"])
         return True
     except Exception:
@@ -236,7 +235,7 @@ async def fill_custom_dropdown(page, trigger, synonyms, label=""):
             "[aria-expanded='true'] input[type='text']:visible, [role='combobox'] input:visible"
         )
         if search_box and synonyms:
-            await search_box.type(synonyms[0], delay=20)
+            await search_box.fill(synonyms[0])
             await page.wait_for_timeout(400)
 
         options = await page.query_selector_all("[role='option']:visible, li[role='option']:visible")

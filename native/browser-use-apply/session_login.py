@@ -3,10 +3,7 @@ import sys
 import argparse
 import json
 import os
-try:
-    from patchright.async_api import async_playwright
-except ImportError:
-    from playwright.async_api import async_playwright
+# Playwright/Patchright imported dynamically in main() based on site
 
 from client_scripts import get_trigger_script
 from auth import wait_for_linkedin_auth, wait_for_wellfound_auth
@@ -62,6 +59,14 @@ async def main():
         except Exception as e:
             print(json.dumps({"type": "log", "message": f"[Payload Error] Failed to load jobs payload: {str(e)}"}))
             sys.stdout.flush()
+
+    if args.site == "wellfound":
+        try:
+            from patchright.async_api import async_playwright
+        except ImportError:
+            from playwright.async_api import async_playwright
+    else:
+        from playwright.async_api import async_playwright
 
     async with async_playwright() as p:
         chrome_args = [
@@ -273,10 +278,40 @@ async def main():
                 except Exception:
                     pass
 
-        await context.expose_binding("triggerAutofill", lambda source: asyncio.create_task(on_autofill_trigger(source)))
-        await context.expose_binding("triggerModalAutofill", lambda source: asyncio.create_task(on_modal_autofill_trigger(source)))
-        await context.expose_binding("checkResume", lambda source: on_check_resume(source))
-        await context.expose_binding("viewResume", lambda source: asyncio.create_task(on_view_resume(source)))
+        # Fallback to console listener for stealth browsers that strip Playwright bindings
+        def setup_console_listener(page):
+            async def handle_console(msg):
+                try:
+                    text = msg.text
+                    if text == "__SYNAPSE_AUTOFILL_TRIGGER__":
+                        asyncio.create_task(on_autofill_trigger({"page": page}))
+                    elif text == "__SYNAPSE_MODAL_AUTOFILL_TRIGGER__":
+                        asyncio.create_task(on_modal_autofill_trigger({"page": page}))
+                    elif text == "__SYNAPSE_VIEW_RESUME_TRIGGER__":
+                        asyncio.create_task(on_view_resume({"page": page}))
+                except Exception:
+                    pass
+            page.on("console", handle_console)
+            
+        context.on("page", setup_console_listener)
+        for p in context.pages:
+            setup_console_listener(p)
+            
+        resume_exists = False
+        if payload_data:
+            rp = payload_data.get("resume_path") or payload_data.get("resumePdfPath")
+            if rp and os.path.exists(rp):
+                resume_exists = True
+        await context.add_init_script(f"window.__SYNAPSE_RESUME_EXISTS = {'true' if resume_exists else 'false'};")
+
+        try:
+            await context.expose_binding("triggerAutofill", lambda source: asyncio.create_task(on_autofill_trigger(source)))
+            await context.expose_binding("triggerModalAutofill", lambda source: asyncio.create_task(on_modal_autofill_trigger(source)))
+            await context.expose_binding("checkResume", lambda source: on_check_resume(source))
+            await context.expose_binding("viewResume", lambda source: asyncio.create_task(on_view_resume(source)))
+        except Exception as e:
+            print(json.dumps({"type": "log", "message": f"[Setup] Could not expose bindings: {e}"}))
+            sys.stdout.flush()
 
         # Popup and Tab lifecycle mapping handlers
         def on_popup(new_page, parent_ctx):

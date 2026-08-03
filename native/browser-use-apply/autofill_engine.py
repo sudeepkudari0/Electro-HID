@@ -46,7 +46,7 @@ async def _run_autofill_impl_inner(page, job_ctx, profile, payload_data):
     cover_letter = job_ctx.get("coverLetterText", "")
     
     # Simple YAML key extractor / Parser
-    yaml_text = profile.get("masterResumeYaml", "")
+    yaml_text = profile.get("masterResumeYaml") or profile.get("masterResumeText", "")
     parsed_yaml = None
     if yaml_text:
         try:
@@ -475,7 +475,24 @@ Form Fields to Fill:
 For each field:
 - If type is "select" or "radio", choose the best index from the "options" list (0-indexed integer).
 - If type is "checkbox", choose true or false.
-- If type is "text" or "textarea", write the correct response (e.g. cover letter, custom screening question answers, salary expectations, notice period, etc.) based on the candidate's profile details. Keep answers professional and concise.
+- If type is "text" or "textarea", write a complete, ready-to-submit answer based on the candidate's profile. Follow these rules without exception:
+
+  1. NO PLACEHOLDERS, EVER. Never write things like "[Insert Company Name]", "[to fill]", "[X years]", or any bracketed placeholder. If a specific detail (like the company name or role) isn't in the candidate profile or field context, infer the most reasonable value from what IS available (e.g. use the job title given in the field context, or write around it naturally without needing the missing detail) and write a complete answer. The output must be something a person could submit right now with zero edits.
+
+  2. STRICT PLAIN TEXT. No markdown, ever. That means: no **bold**, no *italics*, no bullet points, no numbered lists, no headers, no backticks. Do not use em-dashes (—) either — use commas or periods instead. Write in plain paragraphs or plain line breaks only, exactly as someone would type directly into a browser textarea.
+
+  3. SOUND LIKE A HUMAN, NOT AN AI. This is the most important rule. The candidate is a real developer typing this into a form, not a copywriter. Follow these guidelines:
+     - Avoid AI-tell words and phrases: delve, testament, tapestry, leverage, robust, seamless, furthermore, moreover, in today's world, passionate about, thrilled, elevate, unlock, navigate, foster, dive into, game-changer, cutting-edge, at the end of the day.
+     - Keep sentences short and a little uneven in length. Real people don't write in perfectly balanced paragraphs.
+     - It's fine, even encouraged, to start an occasional sentence with "And" or "So" or "Honestly".
+     - Use contractions (I'm, don't, it's) instead of formal full forms.
+     - Avoid summarizing or restating the question back before answering. Just answer it directly, the way a person would in a chat.
+     - Skip the "hook" opening and the neat concluding sentence that ties everything together with a bow. AI text tries to open strong and close strong; humans just answer and stop.
+     - Tone should be casual-professional: like a competent engineer answering a recruiter's screening question on a Tuesday afternoon, not like a cover letter written by a career coach.
+     - Do not use exclamation points more than once per answer, if at all.
+     - Very occasionally (not every answer) it is okay to have a tiny natural imperfection, like a missing comma before "but" or "and", or a slightly informal phrasing choice. Do not overdo this or make the text look sloppy or unprofessional. It should read like a careful person typing quickly, not like a typo-filled mess.
+     - Vary answer length based on question complexity. A technical question like "difference between SSR and CSR" can be 3-5 sentences of real substance. A simple field like "why this role" can be shorter and more direct.
+
 
 Return a strict JSON map from field id to value:
 {{

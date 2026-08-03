@@ -202,8 +202,10 @@ def get_trigger_script():
             modalBtn.onclick = (e) => {
               e.preventDefault();
               e.stopPropagation();
+              console.log("AI Fill Modal Step button clicked!");
               modalBtn.innerHTML = '⏳ Filling Step...';
               modalBtn.disabled = true;
+              console.log("__SYNAPSE_MODAL_AUTOFILL_TRIGGER__");
               if (window.triggerModalAutofill) {
                 window.triggerModalAutofill();
               }
@@ -215,7 +217,10 @@ def get_trigger_script():
             mainBtn.onclick = (e) => {
               e.preventDefault();
               e.stopPropagation();
+              console.log("Autofill button clicked!");
+              console.log("__SYNAPSE_AUTOFILL_TRIGGER__");
               if (window.triggerAutofill) {
+                console.log("Autofill button clicked! inside");
                 window.triggerAutofill();
               }
             };
@@ -229,6 +234,7 @@ def get_trigger_script():
             resumeBtn.onclick = (e) => {
               e.preventDefault();
               e.stopPropagation();
+              console.log("__SYNAPSE_VIEW_RESUME_TRIGGER__");
               if (window.viewResume) {
                 window.viewResume();
               }
@@ -246,7 +252,9 @@ def get_trigger_script():
             // Non-blocking resume check
             setTimeout(() => {
               try {
-                if (window.checkResume) {
+                if (window.__SYNAPSE_RESUME_EXISTS) {
+                  if (resumeBtn) resumeBtn.classList.remove('hidden');
+                } else if (window.checkResume) {
                   window.checkResume().then((exists) => {
                     if (exists && resumeBtn) {
                       resumeBtn.classList.remove('hidden');
@@ -284,7 +292,7 @@ def get_trigger_script():
             }
           };
 
-          window.updateAutofillStatus = (statusText, fields=[]) => {
+          window.updateAutofillStatus = (statusText, arg2, arg3) => {
             const host = document.getElementById('synapse-autofill-host');
             if (!host || !host.shadowRoot) return;
             const shadow = host.shadowRoot;
@@ -295,7 +303,12 @@ def get_trigger_script():
             
             if (card) card.classList.remove('hidden');
             if (status) status.textContent = statusText;
-            if (fieldsList) {
+            
+            let fields = [];
+            if (Array.isArray(arg2)) fields = arg2;
+            else if (Array.isArray(arg3)) fields = arg3;
+            
+            if (fieldsList && fields.length > 0) {
               fieldsList.innerHTML = fields.map(f => `
                 <div class="field-item">
                   <span class="field-name" title="${f.label}">${f.label}</span>
@@ -372,8 +385,10 @@ def get_trigger_script():
               btn.onclick = (e) => {
                 e.preventDefault();
                 e.stopPropagation();
+                console.log("AI Fill Step (injected modal) button clicked!");
                 btn.innerHTML = '⏳ AI Filling Step...';
                 btn.disabled = true;
+                console.log("__SYNAPSE_MODAL_AUTOFILL_TRIGGER__");
                 if (window.triggerModalAutofill) {
                   window.triggerModalAutofill();
                 }
@@ -435,6 +450,7 @@ def get_trigger_script():
           document.addEventListener('keydown', (e) => {
             if (e.ctrlKey && e.shiftKey && e.key.toUpperCase() === 'A') {
               e.preventDefault();
+              console.log("__SYNAPSE_AUTOFILL_TRIGGER__");
               if (window.triggerAutofill) {
                 window.triggerAutofill();
               }

@@ -263,8 +263,21 @@ Master Resume YAML:
    - For experience ranges (e.g. "1-3 years", "3-5 years", "5+ years"), check the candidate's total years of experience or skill experience from the resume and choose the exact matching option index.
    - For work authorization/citizenship/sponsorship questions (e.g. "Are you legally authorized...", "Will you now or in the future require sponsorship..."), answer accurately based on the candidate's country, work authorization, and sponsorship requirement (`authorizedToWork`, `sponsorshipRequired`). If not explicitly stated, assume standard positive work authorization for the candidate's location and no sponsorship required unless specified otherwise.
    
-2. **Text Boxes ("text", "textarea", "number"):**
-   - Provide a direct, concise, professional answer appropriate for the question.
+2. **Open-Ended Text Fields ("text", "textarea"):**
+   - Write a complete, ready-to-submit answer based on the candidate's profile. Follow these rules without exception:
+     - NO PLACEHOLDERS, EVER. Never write things like "[Insert Company Name]", "[to fill]", "[X years]", or any bracketed placeholder. If a specific detail (like the company name or role) isn't in the candidate profile or field context, infer the most reasonable value from what IS available (e.g. use the job title given in the field context, or write around it naturally without needing the missing detail) and write a complete answer. The output must be something a person could submit right now with zero edits.
+     - STRICT PLAIN TEXT. No markdown, ever. That means: no **bold**, no *italics*, no bullet points, no numbered lists, no headers, no backticks. Do not use em-dashes (—) either — use commas or periods instead. Write in plain paragraphs or plain line breaks only, exactly as someone would type directly into a browser textarea.
+     - SOUND LIKE A HUMAN, NOT AN AI. This is the most important rule. The candidate is a real developer typing this into a form, not a copywriter. Follow these guidelines:
+       - Avoid AI-tell words and phrases: delve, testament, tapestry, leverage, robust, seamless, furthermore, moreover, in today's world, passionate about, thrilled, elevate, unlock, navigate, foster, dive into, game-changer, cutting-edge, at the end of the day.
+       - Keep sentences short and a little uneven in length. Real people don't write in perfectly balanced paragraphs.
+       - It's fine, even encouraged, to start an occasional sentence with "And" or "So" or "Honestly".
+       - Use contractions (I'm, don't, it's) instead of formal full forms.
+       - Avoid summarizing or restating the question back before answering. Just answer it directly, the way a person would in a chat.
+       - Skip the "hook" opening and the neat concluding sentence that ties everything together with a bow. AI text tries to open strong and close strong; humans just answer and stop.
+       - Tone should be casual-professional: like a competent engineer answering a recruiter's screening question on a Tuesday afternoon, not like a cover letter written by a career coach.
+       - Do not use exclamation points more than once per answer, if at all.
+       - Very occasionally (not every answer) it is okay to have a tiny natural imperfection, like a missing comma before "but" or "and", or a slightly informal phrasing choice. Do not overdo this or make the text look sloppy or unprofessional. It should read like a careful person typing quickly, not like a typo-filled mess.
+       - Vary answer length based on question complexity. A technical question like "difference between SSR and CSR" can be 3-5 sentences of real substance. A simple field like "why this role" can be shorter and more direct.
    - **Compensation / CTC / RSU / Salary Questions** (e.g., "Please indicate your last CTC", "Please indicate your last RSU", "Expected Salary"):
      - Look up the salary/compensation expectations or current CTC in the candidate's profile/resume. If a specific currency or number is available or requested, provide a realistic, professional figure based on `salaryExpectation` or state "Confidential" / "Negotiable" / "Market rate" or "0" (for RSU if not applicable).
    - **Nationality / Citizenship Questions** (e.g., "Please indicate your nationality*", "Please indicate your citizenship*"):
